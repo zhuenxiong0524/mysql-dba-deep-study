@@ -1,0 +1,15 @@
+cmake -S /data/myhome/mydata/mysql-src/mysql-8.4.10 \
+      -B /data/myhome/mydata/mysql-src/build \
+      -DCMAKE_INSTALL_PREFIX=/usr/local/mysql/mysql-8.4.10 \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DWITH_SSL=system \
+      -DWITH_ZLIB=bundled \
+      -DWITH_ICU=system \
+      -DWITH_UNIT_TESTS=OFF \
+      -DWITH_TESTS=OFF \
+      -DMYSQL_MAINTAINER_MODE=OFF \
+      -DDOWNLOAD_BOOST=0
+
+# 结果: MySQL 8.4.10, C++20, HAVE_TLSv13
+# 注意: 系统 zlib 1.2.11 < 1.2.13 -> 必须 WITH_ZLIB=bundled
+# NUMA 缺失自动禁用(可选); Doxygen 缺失不影响
