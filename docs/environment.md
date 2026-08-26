@@ -47,7 +47,7 @@ cmake -S /data/myhome/mydata/mysql-src/mysql-8.4.10 \
 5. 编译：`make -j1`（1 CPU，约 1.5–3 小时；编译前需 4G swap 防链接 OOM）
 6. 安装：`make install` → `/usr/local/mysql/mysql-8.4.10`
 
-## 初始化与启动（待执行）
+## 初始化与启动（已完成）
 
 ```bash
 # 初始化（root 空密码，后续收紧）
@@ -68,6 +68,13 @@ max_connections=100
 # 启动
 /usr/local/mysql/mysql-8.4.10/bin/mysqld_safe --user=mysql &
 ```
+
+实际配置（/etc/my.cnf）：innodb_buffer_pool_size=64M、innodb_redo_log_capacity=96M、
+performance_schema=OFF、skip-name-resolve、max_connections=100。
+
+验证结果：socket /tmp/mysql.sock，8.4.10，系统库 information_schema/mysql/performance_schema/sys。
+交叉用户：pg@localhost（socket）+ pg@127.0.0.1（TCP，skip-name-resolve 下 TCP 需显式 host），
+密码认证 caching_sha2_password，授权库 cmp。
 
 ## 交叉访问矩阵
 

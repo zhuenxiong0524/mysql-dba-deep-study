@@ -14,7 +14,7 @@
 - mysql 用户免密访问：`psql -U mysql -d mysql -p 54184`
 
 ### MySQL 侧（已就绪）
-- MySQL 8.4.10 LTS，**源码编译安装**，二进制 /usr/local/mysql/mysql-8.4.10，数据 /data/myhome/mydata/mysql，端口 3306，mysql 用户运行
+- MySQL 8.4.10 LTS，**源码编译安装**，二进制 /usr/local/mysql/mysql-8.4.10，数据 /data/myhome/mydata/mysql，端口 3306，mysql 用户运行（已启动，见 check_environment.sh）
 - 源码 /data/myhome/mydata/mysql-src/mysql-8.4.10（源码定位用）
 - 保守参数：innodb_buffer_pool_size=64M、performance_schema=OFF 等
 
@@ -70,6 +70,6 @@
 ## 6. 落地步骤
 
 1. ✅ 安装 MySQL 8.4.10 LTS（源码编译，见 docs/environment.md）
-2. ⬜ 启动 MySQL、建交叉用户 pg@localhost
+2. ✅ 启动 MySQL、建交叉用户 pg@localhost（双向互通已验证）
 3. ⬜ 建立 study_record 结构与学习工作流（Skill + roadmap）
 4. ⬜ 首个专题：MVCC（对照实验 + 迁移表）

@@ -10,17 +10,17 @@ warn() { echo "[WARN] $1"; WARN=$((WARN+1)); }
 fail() { echo "[FAIL] $1"; FAIL=$((FAIL+1)); }
 
 echo "== 软件 =="
-command -v mysql >/dev/null 2>&1 && ok "mysql client: $(command -v mysql)" || warn "mysql client not in PATH"
+MYSQL_BIN=/usr/local/mysql/mysql-8.4.10/bin
+[ -x "$MYSQL_BIN/mysql" ] && ok "mysql client: $MYSQL_BIN/mysql" || warn "mysql client missing at $MYSQL_BIN"
 command -v psql >/dev/null 2>&1 && ok "psql: $(command -v psql)" || warn "psql not in PATH"
 
 echo "== MySQL 8.4 =="
-MYSQL_BIN=/usr/local/mysql/mysql-8.4.10/bin
 [ -x "$MYSQL_BIN/mysqld" ] && ok "mysqld: $MYSQL_BIN/mysqld" || fail "mysqld missing at $MYSQL_BIN"
 [ -d /data/myhome/mydata/mysql ] && ok "datadir: /data/myhome/mydata/mysql" || fail "datadir missing"
 [ -d /data/myhome/mydata/mysql-src/mysql-8.4.10 ] && ok "mysql source: /data/myhome/mydata/mysql-src/mysql-8.4.10" || fail "mysql source missing"
 if [ -S /tmp/mysql.sock ]; then
-  if mysql -uroot -S /tmp/mysql.sock -e "SELECT VERSION();" >/dev/null 2>&1; then
-    ok "MySQL reachable via socket ($(mysql -uroot -S /tmp/mysql.sock -Nse 'SELECT VERSION()' 2>/dev/null))"
+  if "$MYSQL_BIN/mysql" -uroot -S /tmp/mysql.sock -e "SELECT VERSION();" >/dev/null 2>&1; then
+    ok "MySQL reachable via socket ($("$MYSQL_BIN/mysql" -uroot -S /tmp/mysql.sock -Nse 'SELECT VERSION()' 2>/dev/null))"
   else
     warn "socket exists but connect failed"
   fi

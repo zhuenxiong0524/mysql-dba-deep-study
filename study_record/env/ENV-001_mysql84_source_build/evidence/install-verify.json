@@ -1,0 +1,27 @@
+{
+  "task": "ENV-001",
+  "source": "install-verify",
+  "type": "experiment",
+  "mysql_version": "8.4.10 (Source distribution)",
+  "install_prefix": "/usr/local/mysql/mysql-8.4.10",
+  "mysqld_binary": "/usr/local/mysql/mysql-8.4.10/bin/mysqld",
+  "build": {
+    "cmake": "3.30.2",
+    "gcc": "10.2.1",
+    "flags": "Release, WITH_SSL=system, WITH_ZLIB=bundled, WITH_ICU=system, WITHOUT tests",
+    "compile_time_minutes": 180
+  },
+  "instance": {
+    "datadir": "/data/myhome/mydata/mysql",
+    "port": 3306,
+    "socket": "/tmp/mysql.sock",
+    "buffer_pool_mb": 64,
+    "init": "mysqld --initialize-insecure (root empty password)",
+    "start": "mysqld_safe --user=mysql"
+  },
+  "cross_access": {
+    "mysql_to_pg": "psql -U mysql -d mysql -h 127.0.0.1 -p 54184 -> OK (18.4)",
+    "pg_to_mysql": "pg@127.0.0.1 / pg@localhost -> OK (8.4.10, cmp database)"
+  },
+  "databases": ["information_schema", "mysql", "performance_schema", "sys", "cmp"]
+}
