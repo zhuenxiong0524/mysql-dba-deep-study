@@ -1,0 +1,7 @@
+# 本地环境状态，不入库
+docs/environment.local.*
+config/environment.local.*
+*.log
+nohup.out
+__pycache__/
+*.pyc
