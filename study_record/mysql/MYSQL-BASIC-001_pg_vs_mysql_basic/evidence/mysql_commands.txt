@@ -1,0 +1,312 @@
+############ MySQL: Database/Schema ############
+
+## 4.1 MySQL 数据库列表
+Database
+cmp
+db_compare
+information_schema
+mysql
+performance_schema
+sys
+
+## 4.2 SHOW SCHEMAS 与 SHOW DATABASES 是否同义
+Database
+cmp
+db_compare
+information_schema
+mysql
+performance_schema
+sys
+
+## 4.3 MySQL 支持 CREATE DATABASE IF NOT EXISTS + 字符集/排序规则
+*************************** 1. row ***************************
+       Database: db_compare2
+Create Database: CREATE DATABASE `db_compare2` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
+
+## 4.4 MySQL CREATE SCHEMA 是否等于 CREATE DATABASE
+Database (demo%)
+demo_schema
+
+## 4.5 MySQL 删除数据库
+Database (db_compare%)
+db_compare
+
+## 4.6 MySQL USE 前后 connection id（同一连接内）
+cid_before	db_before
+41	NULL
+cid_after	db_after
+41	db_compare
+
+############ MySQL: 建表/数据类型/自增 ############
+
+## 5.1 MySQL 创建 t_user（AUTO_INCREMENT 主键）
+
+## 5.2 MySQL DESC/DESCRIBE/SHOW COLUMNS
+Field	Type	Null	Key	Default	Extra
+id	bigint	NO	PRI	NULL	auto_increment
+name	varchar(50)	NO		NULL	
+age	int	YES		NULL	
+created_at	datetime	YES		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+status	varchar(10)	YES		active	
+amount	decimal(12,2)	YES		NULL	
+is_vip	tinyint(1)	YES		0	
+
+## 5.3 MySQL SHOW CREATE TABLE（注意 boolean→tinyint(1)、AUTO_INCREMENT 计数器）
+*************************** 1. row ***************************
+       Table: t_user
+Create Table: CREATE TABLE `t_user` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `name` varchar(50) NOT NULL,
+  `age` int DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `status` varchar(10) DEFAULT 'active',
+  `amount` decimal(12,2) DEFAULT NULL,
+  `is_vip` tinyint(1) DEFAULT '0',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+
+## 5.4 MySQL information_schema.columns
+ORDINAL_POSITION	COLUMN_NAME	DATA_TYPE	IS_NULLABLE	COLUMN_DEFAULT
+1	id	bigint	NO	NULL
+2	name	varchar	NO	NULL
+3	age	int	YES	NULL
+4	created_at	datetime	YES	CURRENT_TIMESTAMP
+5	status	varchar	YES	active
+6	amount	decimal	YES	NULL
+7	is_vip	tinyint	YES	0
+
+## 5.5 MySQL AUTO_INCREMENT 插入验证 + LAST_INSERT_ID()
+last_id
+1
+id	name	age	created_at	status	amount	is_vip
+1	alice	30	2026-08-27 09:41:22	active	100.50	0
+2	bob	25	2026-08-27 09:41:22	active	200.00	0
+*************************** 1. row ***************************
+           Name: t_user
+         Engine: InnoDB
+        Version: 10
+     Row_format: Dynamic
+           Rows: 2
+ Avg_row_length: 8192
+    Data_length: 16384
+Max_data_length: 0
+   Index_length: 0
+      Data_free: 0
+ Auto_increment: 3
+    Create_time: 2026-08-27 09:41:22
+    Update_time: 2026-08-27 09:41:22
+     Check_time: NULL
+      Collation: utf8mb4_0900_ai_ci
+       Checksum: NULL
+ Create_options: 
+        Comment: 
+
+############ MySQL: DML/SELECT/LIMIT/NULL/字符串/时间 ############
+
+## 6.1 MySQL INSERT/UPDATE/DELETE 输出格式
+
+## 6.2 MySQL SELECT 基础
+id	name	age	created_at	status	amount	is_vip
+3	carol	40	2026-08-27 09:41:41	active	300.00	0
+1	alice	31	2026-08-27 09:41:22	active	100.50	0
+status
+active
+status	count(*)
+active	2
+
+## 6.3 MySQL LIMIT 两种语法
+id
+3
+id
+3
+
+## 6.4 MySQL NULL 行为 + <=>
+null_eq	is_null	is_not_null	null_safe_eq
+NULL	1	0	1
+count(*)
+0
+
+## 6.5 MySQL 字符串：|| 真实行为（默认 sql_mode）
+sql_mode
+ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+pipe_op	concat_fn
+0	abc
+byte_len	char_len
+6	2
+case_eq	lower_fn
+1	abc
+
+## 6.6 MySQL 时间函数
+now	cur_ts	cur_date	cur_time	utc
+2026-08-27 09:41:41	2026-08-27 09:41:41	2026-08-27	09:41:41	2026-08-27 01:41:41
+tomorrow	two_hours_ago	trunc_hour
+2026-08-28 09:41:41	2026-08-27 07:41:41	2026-08-27 09:00:00
+## 6.1b MySQL DML 输出（-vv 模式显示 Query OK）
+--------------
+INSERT INTO t_user(name,age,amount) VALUES ('dave',35,400.00)
+--------------
+
+Query OK, 1 row affected
+
+--------------
+UPDATE t_user SET age=age+1 WHERE name='carol'
+--------------
+
+Query OK, 1 row affected
+Rows matched: 1  Changed: 1  Warnings: 0
+
+--------------
+UPDATE t_user SET age=age WHERE name='carol'
+--------------
+
+Query OK, 0 rows affected
+Rows matched: 1  Changed: 0  Warnings: 0
+
+--------------
+DELETE FROM t_user WHERE name='dave'
+--------------
+
+Query OK, 1 row affected
+
+Bye
+
+############ MySQL: 索引 ############
+## 7.1 MySQL 创建普通/唯一索引
+
+## 7.2 MySQL SHOW INDEX FROM
+Key_name	Seq_in_index	Column_name	Non_unique	Index_type
+PRIMARY	1	id	0	BTREE
+uq_t_user_name	1	name	0	BTREE
+idx_t_user_age	1	age	1	BTREE
+
+## 7.3 MySQL information_schema.statistics
+INDEX_NAME	SEQ_IN_INDEX	COLUMN_NAME	NON_UNIQUE	INDEX_TYPE
+idx_t_user_age	1	age	1	BTREE
+PRIMARY	1	id	0	BTREE
+uq_t_user_name	1	name	0	BTREE
+
+## 7.4 MySQL DROP INDEX 语法（必须带 ON table）
+ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+## 7.4b 验证 DROP INDEX ... ON t_user 已生效
+Key_name	Column_name
+PRIMARY	id
+uq_t_user_name	name
+idx_t_user_age	age
+## 7.4c DROP INDEX ... ON t_user 单独执行
+OK: DROP INDEX idx_t_user_age ON t_user 成功
+ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
+exit=1
+Key_name	Column_name
+PRIMARY	id
+uq_t_user_name	name
+
+############ MySQL: 用户与权限 ############
+## 8.1 MySQL mysql.user 账号（user@host 模型）
+user	host	plugin	account_locked
+compare_user	%	caching_sha2_password	N
+compare_user	127.0.0.1	caching_sha2_password	N
+compare_user	localhost	caching_sha2_password	N
+pg	127.0.0.1	caching_sha2_password	N
+pg	localhost	caching_sha2_password	N
+root	localhost	caching_sha2_password	N
+
+## 8.2 MySQL SHOW GRANTS
+Grants for compare_user@localhost
+GRANT USAGE ON *.* TO `compare_user`@`localhost`
+GRANT ALL PRIVILEGES ON `db_compare`.* TO `compare_user`@`localhost`
+Grants for compare_user@%
+GRANT USAGE ON *.* TO `compare_user`@`%`
+GRANT ALL PRIVILEGES ON `db_compare`.* TO `compare_user`@`%`
+
+## 8.3 MySQL CREATE USER + GRANT + SHOW GRANTS
+Grants for cmp_demo@localhost
+GRANT USAGE ON *.* TO `cmp_demo`@`localhost`
+GRANT SELECT ON `db_compare`.`t_user` TO `cmp_demo`@`localhost`
+
+## 8.4 MySQL REVOKE + DROP USER
+Grants for cmp_demo@localhost
+GRANT USAGE ON *.* TO `cmp_demo`@`localhost`
+
+############ MySQL: Session/Processlist/KILL ############
+## 9.1 performance_schema 开关（本环境 OFF）
+Variable_name	Value
+performance_schema	OFF
+
+## 9.2 SHOW PROCESSLIST
+Id	User	Host	db	Command	Time	State	Info
+5	event_scheduler	localhost	NULL	Daemon	1247	Waiting on empty queue	NULL
+69	root	localhost	NULL	Query	0	init	SHOW PROCESSLIST
+
+## 9.3 information_schema.PROCESSLIST（P_S OFF 时仍可用）
+id	user	host	db	command	time	state	info
+5	event_scheduler	localhost	NULL	Daemon	1247	Waiting on empty queue	NULL
+70	root	localhost	NULL	Query	0	executing	SELECT id, user, host, db, command, time
+
+## 9.4 后台 SLEEP 会话 + KILL（只杀自己的实验连接）
+id	user	command	time	state	info
+71	compare_user	Query	2	User sleep	SELECT SLEEP(60)
+KILL 71;
+-- kill 后 PROCESSLIST 中 compare_user:
+0
+
+############ MySQL: 配置参数 ############
+## 10.1 MySQL SHOW VARIABLES
+Variable_name	Value
+innodb_buffer_pool_size	67108864
+Variable_name	Value
+max_connections	100
+Variable_name	Value
+autocommit	ON
+
+## 10.2 MySQL @@session / @@global 访问
+
+## 10.3 MySQL SET SESSION 修改
+session_val	global_val
+2048	1024
+
+## 10.4 MySQL SET PERSIST_ONLY + RESET PERSIST（演示后清理，不留痕迹）
+@@global.max_connections
+100
+-rw-r----- 1 mysql mysql 174 Aug 27 09:57 /data/myhome/mydata/mysql/mysqld-auto.cnf
+-rw-r----- 1 mysql mysql 14 Aug 27 09:57 /data/myhome/mydata/mysql/mysqld-auto.cnf
+## 10.2b 修正：@@global.innodb_buffer_pool_size（GLOBAL-only 变量）
+session_tz	global_tz	buf_pool_bytes	buf_pool_mb
+SYSTEM	SYSTEM	67108864	64.00000000
+
+############ MySQL: EXPLAIN ############
+## 11.1 MySQL EXPLAIN
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t_user	NULL	ALL	NULL	NULL	NULL	NULL	3	33.33	Using where
+
+## 11.2 MySQL EXPLAIN ANALYZE（8.0.18+，输出 TREE 格式）
+EXPLAIN
+-> Filter: (t_user.age > 20)  (cost=0.55 rows=1) (actual time=2.6..2.6 rows=3 loops=1)\n    -> Table scan on t_user  (cost=0.55 rows=3) (actual time=2.59..2.6 rows=3 loops=1)\n
+
+## 11.3 MySQL EXPLAIN FORMAT=JSON（截取关键字段）
+## 11.3b MySQL EXPLAIN FORMAT=JSON（-Nse 取原始 JSON，截取关键字段）
+## 11.3b MySQL EXPLAIN FORMAT=JSON（-N -s 取原始 JSON）
+## 11.3c EXPLAIN FORMAT=JSON 解析结果（query_block 关键字段）
+{"select_id": 1, "cost_info": {"query_cost": "0.55"}, "table": {"table_name": "t_user", "access_type": "ALL", "rows_examined_per_scan": 3, "rows_produced_per_join": 1, "filtered": "33.33", "cost_info": {"read_cost": "0.45", "eval_cost": "0.10", "prefix_cost": "0.55", "data_read_per_join": "272"}, "used_columns": ["id", "name", "age", "created_at", "status", "amount", "is_vip"], "attached_condition": "(`db_compare`.`t_user`.`age` > 20)"}}
+
+############ MySQL: 客户端元命令 \G ############
+## 12.1 SELECT ... \G 纵向显示
+*************************** 1. row ***************************
+        id: 1
+      name: alice
+       age: 31
+created_at: 2026-08-27 09:41:22
+    status: active
+    amount: 100.50
+    is_vip: 0
+
+## 12.2 多语句中 \G 与 ; 混用
+id	name
+1	alice
+*************************** 1. row ***************************
+  id: 3
+name: carol
+== MySQL: information_schema.tables ==
+TABLE_NAME	TABLE_TYPE	ENGINE	TABLE_ROWS	DATA_LENGTH
+t_ddl_test	BASE TABLE	InnoDB	0	16384
+t_trunc	BASE TABLE	InnoDB	0	16384
+t_user	BASE TABLE	InnoDB	2	16384

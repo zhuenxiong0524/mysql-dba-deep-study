@@ -1,0 +1,37 @@
+############ Linux DBA 高频命令: PG vs MySQL ############
+
+== PG: ps -ef | grep postgres（关键进程）==
+root        1760    1735  0 09:23 pts/1    00:00:00 su - postgres
+postgres    3161       1  0 09:28 ?        00:00:00 /usr/local/pgsql/pgsql18.4/bin/postgres -D /data/pgdata/pgdata18.4
+postgres    3162    3161  0 09:28 ?        00:00:00 postgres: logger 
+postgres    3163    3161  0 09:28 ?        00:00:00 postgres: io worker 2
+postgres    3164    3161  0 09:28 ?        00:00:00 postgres: io worker 1
+postgres    3165    3161  0 09:28 ?        00:00:00 postgres: io worker 0
+postgres    3166    3161  0 09:28 ?        00:00:00 postgres: checkpointer 
+postgres    3167    3161  0 09:28 ?        00:00:00 postgres: background writer 
+
+== PG: pg_ctl status ==
+pg_ctl: server is running (PID: 3161)
+/usr/local/pgsql/pgsql18.4/bin/postgres "-D" "/data/pgdata/pgdata18.4"
+
+== PG: ss -ltnp 54184 ==
+LISTEN 0      200            0.0.0.0:54184      0.0.0.0:*                                     
+LISTEN 0      200               [::]:54184         [::]:*                                     
+
+
+== MySQL: ps -ef | grep mysqld ==
+mysql       4111       1  0 09:36 ?        00:00:00 /bin/sh /usr/local/mysql/mysql-8.4.10/bin/mysqld_safe --user=mysql
+mysql       4323    4111  0 09:36 ?        00:00:06 /usr/local/mysql/mysql-8.4.10/bin/mysqld --basedir=/usr/local/mysql/mysql-8.4.10 --datadir=/data/myhome/mydata/mysql --plugin-dir=/usr/local/mysql/mysql-8.4.10/lib/plugin --log-error=/data/myhome/mydata/mysql/error.log --pid-file=/data/myhome/mydata/mysql/mysql.pid --socket=/tmp/mysql.sock --port=3306
+mysql       6709    2709  1 09:59 ?        00:00:00 /bin/bash -c cd /data/myhome/myfuture/dba_one_year_mysql && B=study_record/mysql/MYSQL-BASIC-001_pg_vs_mysql_basic/evidence && { echo "############ Linux DBA 高频命令: PG vs MySQL ############"; echo; echo "== PG: ps -ef | grep postgres（关键进程）=="; ps -ef | grep -E '[p]ostgres' | grep -vE 'redis|patroni|pgbouncer|tmux|codex|mongod|node|bash' | head -8; echo; echo "== PG: pg_ctl status =="; sudo -n -u postgres /usr/local/pgsql/pgsql18.4/bin/pg_ctl -D /data/pgdata/pgdata18.4 status 2>&1; echo; echo "== PG: ss -ltnp 54184 =="; ss -ltnp 2>/dev/null | grep 54184; echo; echo; echo "== MySQL: ps -ef | grep mysqld =="; ps -ef | grep -E '[m]ysqld' | head -3; echo; echo "== MySQL: mysqladmin ping/status =="; /usr/local/mysql/mysql-8.4.10/bin/mysqladmin -uroot -S /tmp/mysql.sock ping 2>&1; /usr/local/mysql/mysql-8.4.10/bin/mysqladmin -uroot -S /tmp/mysql.sock status 2>&1 | head -2; echo; echo "== MySQL: systemctl status（确认无 systemd 单元）=="; systemctl status mysqld 2>&1 | head -3; systemctl status mysql 2>&1 | head -3; echo; echo "== MySQL: ss -ltnp 3306 =="; ss -ltnp 2>/dev/null | grep 3306; } > $B/linux_commands.txt && cat $B/linux_commands.txt
+
+== MySQL: mysqladmin ping/status ==
+mysqld is alive
+Uptime: 1387  Threads: 2  Questions: 430  Slow queries: 2  Opens: 413  Flush tables: 3  Open tables: 317  Queries per second avg: 0.310
+
+== MySQL: systemctl status（确认无 systemd 单元）==
+Unit mysqld.service could not be found.
+Unit mysql.service could not be found.
+
+== MySQL: ss -ltnp 3306 ==
+LISTEN 0      70                   *:33060            *:*    users:(("mysqld",pid=4323,fd=18))
+LISTEN 0      100                  *:3306             *:*    users:(("mysqld",pid=4323,fd=20))

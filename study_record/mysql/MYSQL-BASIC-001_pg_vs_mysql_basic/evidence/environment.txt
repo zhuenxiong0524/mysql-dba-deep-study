@@ -1,0 +1,95 @@
+===== 实验环境信息 2026-08-27 09:36:34 CST =====
+
+--- 1. Linux 发行版 ---
+PRETTY_NAME="Debian GNU/Linux 11 (bullseye)"
+NAME="Debian GNU/Linux"
+VERSION_ID="11"
+VERSION="11 (bullseye)"
+VERSION_CODENAME=bullseye
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
+
+--- 2. 内核 ---
+Linux node01 5.10.0-38-amd64 #1 SMP Debian 5.10.249-1 (2026-02-10) x86_64 GNU/Linux
+
+--- 3. 机器资源 ---
+               total        used        free      shared  buff/cache   available
+Mem:            1935        1606          70          26         258         158
+Swap:              0           0           0
+1
+
+--- 4. PostgreSQL 服务进程 ---
+postgres     612       1  1 09:14 ?        00:00:13 /usr/local/bin/redis-server 0.0.0.0:6379
+postgres     678       1  0 09:14 ?        00:00:03 /usr/bin/python3 /usr/local/bin/patroni /etc/patroni.yml
+postgres     679       1  0 09:14 ?        00:00:00 /usr/local/bin/pgbouncer /etc/pgbouncer/pgbouncer.ini
+root        1760    1735  0 09:23 pts/1    00:00:00 su - postgres
+postgres    1762    1760  0 09:23 pts/1    00:00:00 -bash
+postgres    1805    1762  0 09:23 pts/1    00:00:00 tmux new -s mongodb
+postgres    1807       1  1 09:23 ?        00:00:08 tmux new -s mongodb
+postgres    1808    1807  0 09:23 pts/2    00:00:00 -bash
+postgres    1815    1807  0 09:24 pts/3    00:00:00 -bash
+postgres    1917    1808  0 09:24 pts/2    00:00:00 node /home/postgres/.npm-global/bin/codex
+postgres    1924    1917  3 09:24 pts/2    00:00:28 /home/postgres/.npm-global/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex
+postgres    2015    1924  0 09:24 pts/2    00:00:00 python3 /data/myfuture/dba_one_year_codex/pg_study-agent/v0.5.1/src/bin/pg_study_agent_mcp_v051
+postgres    2017    1924  0 09:24 pts/2    00:00:00 python3 /data/myfuture/dba_one_year_codex/pg_study-agent/v0.5/src/bin/pg_study_agent_mcp_v05
+postgres    2518       1  5 09:26 ?        00:00:32 /usr/local/mongodb/bin/mongod --config /data/mongodb-data/mongod.conf
+postgres    3028    1924  0 09:28 ?        00:00:00 /bin/bash -lc cat /etc/patroni.yml | head -60; echo '==='; patronictl -c /etc/patroni.yml list 2>&1 | head -10
+postgres    3032    3028  0 09:28 ?        00:00:01 /usr/bin/python3 /usr/local/bin/patronictl -c /etc/patroni.yml list
+postgres    3161       1  0 09:28 ?        00:00:00 /usr/local/pgsql/pgsql18.4/bin/postgres -D /data/pgdata/pgdata18.4
+postgres    3162    3161  0 09:28 ?        00:00:00 postgres: logger 
+postgres    3163    3161  0 09:28 ?        00:00:00 postgres: io worker 2
+postgres    3164    3161  0 09:28 ?        00:00:00 postgres: io worker 1
+
+--- 5. PostgreSQL 监听端口 ---
+LISTEN 0      200            0.0.0.0:54184      0.0.0.0:*                                     
+LISTEN 0      200               [::]:54184         [::]:*                                     
+
+--- 6. MySQL 服务进程 ---
+mysql       4111       1  0 09:36 ?        00:00:00 /bin/sh /usr/local/mysql/mysql-8.4.10/bin/mysqld_safe --user=mysql
+mysql       4323    4111  2 09:36 ?        00:00:00 /usr/local/mysql/mysql-8.4.10/bin/mysqld --basedir=/usr/local/mysql/mysql-8.4.10 --datadir=/data/myhome/mydata/mysql --plugin-dir=/usr/local/mysql/mysql-8.4.10/lib/plugin --log-error=/data/myhome/mydata/mysql/error.log --pid-file=/data/myhome/mydata/mysql/mysql.pid --socket=/tmp/mysql.sock --port=3306
+
+--- 7. MySQL 监听端口 ---
+LISTEN 0      70                   *:33060            *:*    users:(("mysqld",pid=4323,fd=18))
+LISTEN 0      100                  *:3306             *:*    users:(("mysqld",pid=4323,fd=20))
+
+--- 8. 配置文件 ---
+PG: $(SHOW config_file) / MySQL: /etc/my.cnf
+
+--- 9. PG 服务端版本 ---
+PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+
+--- 10. PG 客户端版本 ---
+psql (PostgreSQL) 18.4
+
+--- 11. PG 数据目录/端口/配置 ---
+port = 54184
+
+--- 12. PG 字符集/排序/时区 ---
+server_encoding = UTF8
+standard_conforming_strings = on
+TimeZone = Asia/Shanghai
+
+--- 13. MySQL 服务端版本 ---
+8.4.10
+
+--- 14. MySQL 客户端版本 ---
+/usr/local/mysql/mysql-8.4.10/bin/mysql  Ver 8.4.10 for Linux on x86_64 (Source distribution)
+
+--- 15. MySQL 数据目录/端口/配置 ---
+basedir	/usr/local/mysql/mysql-8.4.10/
+datadir	/data/myhome/mydata/mysql/
+default_storage_engine	InnoDB
+lower_case_table_names	0
+port	3306
+socket	/tmp/mysql.sock
+
+--- 16. MySQL 字符集/排序/时区 ---
+character_set_client	utf8mb4
+character_set_connection	utf8mb4
+character_set_server	utf8mb4
+collation_server	utf8mb4_0900_ai_ci
+system_time_zone	CST
+time_zone	SYSTEM
+2026-08-27 09:36:40	2026-08-27 01:36:40	08:00:00

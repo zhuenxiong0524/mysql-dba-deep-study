@@ -1,0 +1,34 @@
+############ DDL 事务性实验: PG vs MySQL ############
+
+== PG: BEGIN; CREATE TABLE; ROLLBACK —— DDL 是否可回滚 ==
+ROLLBACK
+              List of tables
+ Schema |   Name   | Type  |    Owner     
+--------+----------+-------+--------------
+ public | t_serial | table | compare_user
+ public | t_user   | table | compare_user
+(2 rows)
+
+
+-- PG 回滚后 t_ddl_test 是否存在:
+0
+
+
+== MySQL: START TRANSACTION; CREATE TABLE; ROLLBACK —— DDL 是否可回滚 ==
+Tables_in_db_compare (t_ddl_test)
+t_ddl_test
+
+-- MySQL 回滚后 t_ddl_test 是否存在:
+1
+
+== MySQL: TRUNCATE 隐式提交（DDL）==
+cnt
+0
+
+== PG: TRUNCATE 可回滚（对照）==
+CREATE TABLE
+INSERT 0 1
+BEGIN
+TRUNCATE TABLE
+ROLLBACK
+1

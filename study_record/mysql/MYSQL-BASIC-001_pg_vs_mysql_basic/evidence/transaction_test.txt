@@ -1,0 +1,32 @@
+############ 事务实验: PG vs MySQL（同一实验设计两边跑）############
+
+== PG: autocommit 默认行为 ==
+
+== PG: BEGIN; INSERT; ROLLBACK ==
+BEGIN
+INSERT 0 1
+ROLLBACK
+0
+
+== PG: BEGIN; INSERT; COMMIT ==
+BEGIN
+INSERT 0 1
+COMMIT
+commit_test
+
+
+== MySQL: autocommit 默认行为 ==
+
+== MySQL: START TRANSACTION; INSERT; ROLLBACK ==
+cnt
+0
+
+== MySQL: START TRANSACTION; INSERT; COMMIT ==
+name
+commit_test
+== MySQL: autocommit 默认行为（修正）==
+1
+
+== MySQL: 连接级 autocommit 可变（SET autocommit=0 后 SELECT @@autocommit）==
+@@autocommit
+0

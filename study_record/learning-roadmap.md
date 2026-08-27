@@ -170,3 +170,11 @@
 ### DR-001 故障演练对照（S，P2，新增）
 - 同故障两边演练对照：OOM（PG 进程隔离 vs MySQL 线程全挂风险）、磁盘满、连接打满、主从切换、崩溃恢复
 - 交付：故障演练清单 + 处置 SOP 对照表（MySQL 侧为主体）
+
+## MYSQL-BASIC 基础命令对照（新增系列，v0.4 2026-08-27）
+
+### MYSQL-BASIC-001 基础命令与核心概念对照（M，P0，已完成文章）
+- PG 基线：psql 元命令、pg_stat_activity、pg_settings、role、事务/DDL 语义
+- MySQL：mysql 客户端、SHOW 系列、PROCESSLIST、SHOW VARIABLES、user@host、autocommit/DDL 隐式提交
+- 实验：26 类"同命令两边跑"，输出见 study_record/mysql/MYSQL-BASIC-001_pg_vs_mysql_basic/evidence/
+- 交付：对照文章（16 条易踩坑 + 30+ 概念映射表）+ 22 道验证题

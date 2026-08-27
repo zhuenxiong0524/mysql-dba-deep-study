@@ -1,0 +1,443 @@
+############ PG: Database/Schema ############
+
+## 4.1 PG 数据库列表
+                                                        List of databases
+    Name    |    Owner     | Encoding | Locale Provider |   Collate   |    Ctype    | Locale | ICU Rules |   Access privileges   
+------------+--------------+----------+-----------------+-------------+-------------+--------+-----------+-----------------------
+ buf_study  | postgres     | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | 
+ db_compare | compare_user | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | 
+ mysql      | mysql        | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | 
+ postgres   | postgres     | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | 
+ regression | postgres     | UTF8     | libc            | C           | C           |        |           | 
+ template0  | postgres     | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | =c/postgres          +
+            |              |          |                 |             |             |        |           | postgres=CTc/postgres
+ template1  | postgres     | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | =c/postgres          +
+            |              |          |                 |             |             |        |           | postgres=CTc/postgres
+ testzex    | postgres     | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | 
+ testzex1   | postgres     | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |        |           | 
+(9 rows)
+
+postgres
+regression
+template1
+template0
+buf_study
+testzex
+testzex1
+mysql
+db_compare
+
+## 4.2 PG 创建数据库（带 OWNER/ENCODING/TEMPLATE/CONNECTION LIMIT）
+CREATE DATABASE
+## 4.3 PG 不支持 CREATE DATABASE IF NOT EXISTS
+ERROR:  syntax error at or near "NOT"
+LINE 1: CREATE DATABASE IF NOT EXISTS db_compare2;
+                           ^
+
+## 4.4 PG 删除数据库
+DROP DATABASE
+
+## 4.5 PG Schema 层级
+ERROR:  syntax error at or near "\"
+LINE 1: ...ET search_path TO demo_schema, public; SHOW search_path; \dn
+                                                                    ^
+
+## 4.6 PG 切换数据库 \c 前后 backend pid
+before: db=mysql pid=5007
+You are now connected to database "db_compare" as user "mysql".
+after: db=db_compare pid=5008
+## 4.5b PG Schema 层级（修正）
+CREATE SCHEMA
+         List of schemas
+    Name     |       Owner       
+-------------+-------------------
+ demo_schema | postgres
+ public      | pg_database_owner
+(2 rows)
+
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+SET
+     search_path     
+---------------------
+ demo_schema, public
+(1 row)
+
+
+############ PG: 建表/数据类型/自增 ############
+
+## 5.1 PG 创建 t_user（identity 主键）
+NOTICE:  table "t_user" does not exist, skipping
+DROP TABLE
+CREATE TABLE
+
+## 5.2 PG \d t_user / \d+ t_user
+                                    Table "public.t_user"
+   Column   |           Type           | Collation | Nullable |           Default            
+------------+--------------------------+-----------+----------+------------------------------
+ id         | bigint                   |           | not null | generated always as identity
+ name       | character varying(50)    |           | not null | 
+ age        | integer                  |           |          | 
+ created_at | timestamp with time zone |           |          | now()
+ status     | character varying(10)    |           |          | 'active'::character varying
+ amount     | numeric(12,2)            |           |          | 
+ is_vip     | boolean                  |           |          | false
+Indexes:
+    "t_user_pkey" PRIMARY KEY, btree (id)
+
+                                                               Table "public.t_user"
+   Column   |           Type           | Collation | Nullable |           Default            | Storage  | Compression | Stats target | Description 
+------------+--------------------------+-----------+----------+------------------------------+----------+-------------+--------------+-------------
+ id         | bigint                   |           | not null | generated always as identity | plain    |             |              | 
+ name       | character varying(50)    |           | not null |                              | extended |             |              | 
+ age        | integer                  |           |          |                              | plain    |             |              | 
+ created_at | timestamp with time zone |           |          | now()                        | plain    |             |              | 
+ status     | character varying(10)    |           |          | 'active'::character varying  | extended |             |              | 
+ amount     | numeric(12,2)            |           |          |                              | main     |             |              | 
+ is_vip     | boolean                  |           |          | false                        | plain    |             |              | 
+Indexes:
+    "t_user_pkey" PRIMARY KEY, btree (id)
+Not-null constraints:
+    "t_user_id_not_null" NOT NULL "id"
+    "t_user_name_not_null" NOT NULL "name"
+Access method: heap
+
+
+## 5.3 PG \dt / information_schema.columns
+             List of tables
+ Schema |  Name  | Type  |    Owner     
+--------+--------+-------+--------------
+ public | t_user | table | compare_user
+(1 row)
+
+1. id | bigint | null=NO | default=(null)
+2. name | character varying | null=NO | default=(null)
+3. age | integer | null=YES | default=(null)
+4. created_at | timestamp with time zone | null=YES | default=now()
+5. status | character varying | null=YES | default='active'::character varying
+6. amount | numeric | null=YES | default=(null)
+7. is_vip | boolean | null=YES | default=false
+
+## 5.4 PG identity 插入验证
+ id 
+----
+  1
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+ id | name  | age |          created_at           | status | amount | is_vip 
+----+-------+-----+-------------------------------+--------+--------+--------
+  1 | alice |  30 | 2026-08-27 09:41:12.6654+08   | active | 100.50 | f
+  2 | bob   |  25 | 2026-08-27 09:41:12.668438+08 | active | 200.00 | f
+(2 rows)
+
+
+## 5.5 PG serial 与 sequence 对象
+CREATE TABLE
+                            Table "public.t_serial"
+ Column |  Type   | Collation | Nullable |               Default                
+--------+---------+-----------+----------+--------------------------------------
+ id     | integer |           | not null | nextval('t_serial_id_seq'::regclass)
+ note   | text    |           |          | 
+Indexes:
+    "t_serial_pkey" PRIMARY KEY, btree (id)
+
+t_user_id_seq last_value=2
+
+## 5.2b PG \d t_user 完整输出
+                                    Table "public.t_user"
+   Column   |           Type           | Collation | Nullable |           Default            
+------------+--------------------------+-----------+----------+------------------------------
+ id         | bigint                   |           | not null | generated always as identity
+ name       | character varying(50)    |           | not null | 
+ age        | integer                  |           |          | 
+ created_at | timestamp with time zone |           |          | now()
+ status     | character varying(10)    |           |          | 'active'::character varying
+ amount     | numeric(12,2)            |           |          | 
+ is_vip     | boolean                  |           |          | false
+Indexes:
+    "t_user_pkey" PRIMARY KEY, btree (id)
+
+
+############ PG: DML/SELECT/LIMIT/NULL/字符串/时间 ############
+
+## 6.1 PG INSERT/UPDATE/DELETE 输出格式
+INSERT 0 1
+UPDATE 1
+UPDATE 1
+DELETE 1
+
+## 6.2 PG SELECT 基础（WHERE/ORDER BY/LIMIT/DISTINCT/GROUP BY/HAVING）
+ id | name  | age |          created_at           | status | amount | is_vip 
+----+-------+-----+-------------------------------+--------+--------+--------
+  3 | carol |  40 | 2026-08-27 09:41:34.670364+08 | active | 300.00 | f
+  1 | alice |  31 | 2026-08-27 09:41:12.6654+08   | active | 100.50 | f
+(2 rows)
+
+ status 
+--------
+ active
+(1 row)
+
+ status | count 
+--------+-------
+ active |     2
+(1 row)
+
+
+## 6.3 PG LIMIT 语法：只有 LIMIT n OFFSET m
+ id 
+----
+  3
+(1 row)
+
+ERROR:  LIMIT #,# syntax is not supported
+LINE 1: SELECT id FROM t_user ORDER BY id LIMIT 1,1;
+                                          ^
+HINT:  Use separate LIMIT and OFFSET clauses.
+
+## 6.4 PG NULL 行为
+ null_eq | is_null | is_not_null 
+---------+---------+-------------
+         | t       | f
+(1 row)
+
+ count 
+-------
+     0
+(1 row)
+
+
+## 6.5 PG 字符串拼接/长度/大小写
+  concat_op  | concat_fn 
+-------------+-----------
+ hello world | abc
+(1 row)
+
+ chars_len | byte_len 
+-----------+----------
+         2 |        6
+(1 row)
+
+ case_eq | lower_fn 
+---------+----------
+ f       | abc
+(1 row)
+
+
+## 6.6 PG 时间函数
+              now              |            cur_ts             |  cur_date  |      cur_time      
+-------------------------------+-------------------------------+------------+--------------------
+ 2026-08-27 09:41:34.743681+08 | 2026-08-27 09:41:34.743681+08 | 2026-08-27 | 09:41:34.743681+08
+(1 row)
+
+           tomorrow           |        two_hours_ago         |       trunc_hour       
+------------------------------+------------------------------+------------------------
+ 2026-08-28 09:41:34.74465+08 | 2026-08-27 07:41:34.74465+08 | 2026-08-27 09:00:00+08
+(1 row)
+
+
+############ PG: 索引 ############
+## 7.1 PG 创建普通/唯一索引
+CREATE INDEX
+CREATE INDEX
+
+## 7.2 PG \di 与 pg_indexes
+                      List of indexes
+ Schema |      Name      | Type  |    Owner     |  Table   
+--------+----------------+-------+--------------+----------
+ public | idx_t_user_age | index | compare_user | t_user
+ public | t_serial_pkey  | index | compare_user | t_serial
+ public | t_user_pkey    | index | compare_user | t_user
+ public | uq_t_user_name | index | compare_user | t_user
+(4 rows)
+
+idx_t_user_age | CREATE INDEX idx_t_user_age ON public.t_user USING btree (age)
+t_user_pkey | CREATE UNIQUE INDEX t_user_pkey ON public.t_user USING btree (id)
+uq_t_user_name | CREATE UNIQUE INDEX uq_t_user_name ON public.t_user USING btree (name)
+
+## 7.3 PG DROP INDEX 语法（不需要 ON table）
+DROP INDEX
+                      List of indexes
+ Schema |      Name      | Type  |    Owner     |  Table   
+--------+----------------+-------+--------------+----------
+ public | t_serial_pkey  | index | compare_user | t_serial
+ public | t_user_pkey    | index | compare_user | t_user
+ public | uq_t_user_name | index | compare_user | t_user
+(3 rows)
+
+
+############ PG: 用户与权限 ############
+## 8.1 PG \du 角色列表
+                               List of roles
+  Role name   |                         Attributes                         
+--------------+------------------------------------------------------------
+ compare_user | 
+ mysql        | 
+ postgres     | Superuser, Create role, Create DB, Replication, Bypass RLS
+
+
+## 8.2 PG pg_roles 关键属性（compare_user）
+compare_user login=true super=false createdb=false createrole=false connlimit=-1
+
+## 8.3 PG CREATE USER 与 CREATE ROLE 的关系
+                               List of roles
+  Role name   |                         Attributes                         
+--------------+------------------------------------------------------------
+ cmp_demo     | 
+ compare_user | 
+ mysql        | 
+ postgres     | Superuser, Create role, Create DB, Replication, Bypass RLS
+
+
+## 8.4 PG GRANT/REVOKE
+GRANT
+                                      Access privileges
+ Schema |  Name  | Type  |         Access privileges          | Column privileges | Policies 
+--------+--------+-------+------------------------------------+-------------------+----------
+ public | t_user | table | compare_user=arwdDxtm/compare_user+|                   | 
+        |        |       | cmp_demo=r/compare_user            |                   | 
+(1 row)
+
+REVOKE
+
+############ PG: Session/进程/KILL ############
+## 9.1 pg_stat_activity 当前会话
+ pid  | usename | datname | client_addr | state  | wait_event_type | wait_event |                  query                   
+------+---------+---------+-------------+--------+-----------------+------------+------------------------------------------
+ 6395 | mysql   | mysql   | 127.0.0.1   | active |                 |            | SELECT pid, usename, datname, client_add
+(1 row)
+
+
+## 9.2 后台 pg_sleep 会话 + pg_terminate_backend
+ pid | usename | state | wait_event_type | wait_event | query 
+-----+---------+-------+-----------------+------------+-------
+(0 rows)
+
+pg_terminate_backend();
+ERROR:  function pg_terminate_backend() does not exist
+LINE 1: SELECT pg_terminate_backend();
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+-- terminate 后 compare_user 会话数:
+1
+## 9.2b 超管视角：pg_stat_activity 能看到 sleep 会话与查询
+ pid  |   usename    | state  | wait_event_type | wait_event |        query         
+------+--------------+--------+-----------------+------------+----------------------
+ 6398 | compare_user | active | Timeout         | PgSleep    | SELECT pg_sleep(60);
+ 6426 | compare_user | active | Timeout         | PgSleep    | SELECT pg_sleep(60);
+(2 rows)
+
+SLEEP PIDs: 6398,6426
+ERROR:  function pg_terminate_backend() does not exist
+LINE 1: SELECT pg_terminate_backend() FROM (SELECT pid AS SLEEPPID F...
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+-- terminate 后:
+2
+## 9.2c pg_terminate_backend(pid) 逐个终止
+PIDs=6398,6426
+ pg_terminate_backend 
+----------------------
+ t
+(1 row)
+
+ pg_terminate_backend 
+----------------------
+ t
+(1 row)
+
+-- terminate 后 compare_user 会话数:
+0
+
+############ PG: 配置参数 ############
+## 10.1 PG SHOW / pg_settings
+ work_mem 
+----------
+ 4MB
+(1 row)
+
+      name       | setting | unit |  context   | vartype 
+-----------------+---------+------+------------+---------
+ max_connections | 100     |      | postmaster | integer
+ shared_buffers  | 16384   | 8kB  | postmaster | integer
+ work_mem        | 4096    | kB   | user       | integer
+(3 rows)
+
+
+## 10.2 PG SET SESSION 修改
+SET
+ work_mem 
+----------
+ 8MB
+(1 row)
+
+RESET
+ work_mem 
+----------
+ 4MB
+(1 row)
+
+
+############ PG: EXPLAIN ############
+## 11.1 PG EXPLAIN
+                       QUERY PLAN                       
+--------------------------------------------------------
+ Seq Scan on t_user  (cost=0.00..1.02 rows=1 width=193)
+   Filter: (age > 20)
+(2 rows)
+
+
+## 11.2 PG EXPLAIN (ANALYZE, BUFFERS)
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
+ Seq Scan on t_user  (cost=0.00..1.02 rows=1 width=193) (actual time=0.016..0.019 rows=3.00 loops=1)
+   Filter: (age > 20)
+   Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=95
+ Planning Time: 0.647 ms
+ Execution Time: 0.099 ms
+(7 rows)
+
+
+############ PG: 客户端元命令 \x ############
+## 12.1 psql \x 纵向显示
+-[ RECORD 1 ]---------------------------
+id         | 1
+name       | alice
+age        | 31
+created_at | 2026-08-27 09:41:12.6654+08
+status     | active
+amount     | 100.50
+is_vip     | f
+
+
+## 12.2 psql \x 交互式切换（\x on 后查询）
+Expanded display is on.
+-[ RECORD 1 ]
+id   | 1
+name | alice
+
+== PG: \dt+ 与 information_schema.tables ==
+                                          List of tables
+ Schema |   Name   | Type  |    Owner     | Persistence | Access method |    Size    | Description 
+--------+----------+-------+--------------+-------------+---------------+------------+-------------
+ public | t_serial | table | compare_user | permanent   | heap          | 8192 bytes | 
+ public | t_trunc  | table | compare_user | permanent   | heap          | 8192 bytes | 
+ public | t_user   | table | compare_user | permanent   | heap          | 8192 bytes | 
+t_serial
+t_trunc
+t_user
+
+== PG: \d+ t_user 尾部（存储参数）==
+    "uq_t_user_name" UNIQUE, btree (name)
+Not-null constraints:
+    "t_user_id_not_null" NOT NULL "id"
+    "t_user_name_not_null" NOT NULL "name"
+Access method: heap
+
