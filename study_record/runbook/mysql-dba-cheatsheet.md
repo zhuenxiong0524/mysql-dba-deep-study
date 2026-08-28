@@ -63,9 +63,31 @@ SHOW GRANTS FOR CURRENT_USER;
 ## 参数从哪里来的？
 
 ```sql
-SHOW VARIABLES LIKE 'innodb_buffer_pool_size';   -- 当前生效值
-SELECT * FROM performance_schema.variables_info; -- 来源（需 P_S=ON，本机 OFF）
--- 配置文件 /etc/my.cnf；PERSIST 文件 /data/myhome/mydata/mysql/mysqld-auto.cnf
+SHOW GLOBAL VARIABLES LIKE 'innodb_buffer_pool_size';  -- 当前生效值（GLOBAL 视角）
+SHOW VARIABLES LIKE 'transaction_isolation';           -- SESSION 视角
+```
+
+```bash
+my_print_defaults mysqld               # 配置链合成结果
+cat /data/myhome/mydata/mysql/mysqld-auto.cnf   # SET PERSIST 残留（优先级高于 my.cnf）
+ps -ef | grep mysqld                   # 启动命令行参数
+```
+
+## 改参数三态（本机实测，ENV-006）
+
+| 分类 | 示例 | 改法 | 重启后 |
+|---|---|---|---|
+| 会话级 | transaction_isolation / sort_buffer_size | `SET SESSION x=...` | 丢失 |
+| 全局动态 | max_connections / server_id(8.0+) | `SET GLOBAL x=...` 或 `SET PERSIST x=...` | GLOBAL 丢失 / PERSIST 保留 |
+| 静态需重启 | port / performance_schema | 改 my.cnf 或 `SET PERSIST_ONLY` | 保留 |
+
+```sql
+SET SESSION sort_buffer_size=524288;          -- 仅本会话
+SET GLOBAL max_connections=200;               -- 在线生效，不持久
+SET PERSIST max_connections=105;              -- 在线生效 + 写 auto.cnf，重启保留
+SET PERSIST_ONLY innodb_buffer_pool_size=...; -- 只写文件，下次重启生效
+RESET PERSIST max_connections;                -- 从 auto.cnf 删除
+-- 静态参数 SET GLOBAL → ERROR 1238 (HY000) read only variable → 需重启
 ```
 
 ## 待填充（随专题扩展）

@@ -1,0 +1,98 @@
+===== MySQL: 配置搜索路径（mysqld --verbose --help）=====
+Default options are read from the following files in the given order:
+/etc/my.cnf /etc/mysql/my.cnf /data/myhome/mydata/mysql-8.4.10/etc/my.cnf ~/.my.cnf 
+The following groups are read: mysql_cluster mysqld server mysqld-8.4
+The following options may be given as the first argument:
+--print-defaults        Print the program argument list and exit.
+--no-defaults           Don't read default options from any option file,
+
+===== MySQL: 当前生效配置链（my_print_defaults）=====
+--datadir=/data/myhome/mydata/mysql
+--port=3306
+--socket=/tmp/mysql.sock
+--pid-file=/data/myhome/mydata/mysql/mysql.pid
+--log_error=/data/myhome/mydata/mysql/error.log
+--innodb_buffer_pool_size=64M
+--innodb_redo_log_capacity=96M
+--performance_schema=OFF
+--skip-name-resolve
+--max_connections=100
+--character_set_server=utf8mb4
+
+===== MySQL: 配置链上的文件 =====
+-rw-r--r-- 1 root root 314 Aug 26 17:46 /etc/my.cnf
+ls: cannot access '/etc/mysql/': No such file or directory
+ls: cannot access '/home/mysql/.my.cnf': No such file or directory
+
+===== MySQL: SHOW VARIABLES 三式 =====
+g_max	s_tx_iso	cur_max	bp_mb	log_bin
+100	REPEATABLE-READ	100	64.00000000	1
+Variable_name	Value
+max_connections	100
+Variable_name	Value
+transaction_isolation	REPEATABLE-READ
+
+===== MySQL: SESSION 级修改（只影响本会话）=====
+sess_iso	glob_iso
+READ-COMMITTED	REPEATABLE-READ
+new_sess_iso
+REPEATABLE-READ
+
+===== MySQL: 动态 GLOBAL（影响新连接，在线生效）=====
+@@GLOBAL.max_connections
+200
+seen_from_new_conn
+200
+
+===== MySQL: 静态/只读参数（需重启，报错 1238）=====
+ERROR 1238 (HY000) at line 1: Variable 'port' is a read only variable
+ERROR 1238 (HY000) at line 1: Variable 'performance_schema' is a read only variable
+
+===== MySQL: 还原 max_connections =====
+@@GLOBAL.max_connections
+100
+===== 修复: server_id 还原（8.0+ 动态参数）=====
+@@GLOBAL.server_id
+1
+
+===== MySQL: SET PERSIST（写 mysqld-auto.cnf，立即生效+重启保留）=====
+@@GLOBAL.max_connections
+105
+--- mysqld-auto.cnf 内容 ---
+{"Version": 2, "mysql_dynamic_parse_early_variables": {"max_connections": {"Value": "105", "Metadata": {"Host": "localhost", "User": "root", "Timestamp": 1787887954371274}}}}
+===== MySQL: SET PERSIST_ONLY（只写文件，不立即生效）=====
+bp_mb_now
+64.00000000
+--- mysqld-auto.cnf 内容 ---
+{"Version": 2, "mysql_static_variables": {"innodb_buffer_pool_size": {"Value": "134217728", "Metadata": {"Host": "localhost", "User": "root", "Timestamp": 1787887954394278}}}, "mysql_dynamic_parse_early_variables": {"max_connections": {"Value": "105", "Metadata": {"Host": "localhost", "User": "root", "Timestamp": 1787887954371274}}}}
+===== MySQL: 清理 PERSIST 文件 =====
+bp_mb
+64.00000000
+--- 当前 mysqld-auto.cnf（应只剩 max_connections=105，留待重启验证）---
+{"Version": 2, "mysql_dynamic_parse_early_variables": {"max_connections": {"Value": "105", "Metadata": {"Host": "localhost", "User": "root", "Timestamp": 1787887954371274}}}}===== 清理后校验 =====
+max_conn	server_id	bp_mb	port
+100	1	64.00000000	3306
+--- mysqld-auto.cnf（应为空对象）---
+{"Version": 2}
+===== MySQL: 参数可改性速查（三态分类证据）=====
+ERROR 1054 (42S22) at line 1: Unknown column 'VARIABLE_SCOPE' in 'field list'
+（注: P_S=OFF 时 global_variables 表不可用，以上按需）
+===== MySQL: SESSION 级 sort_buffer_size（连接级，非持久）=====
+g	s
+262144	262144
+g	s
+262144	262144
+new_sess
+262144
+
+===== MySQL: 优先级证据（PERSIST 覆盖 my.cnf 的 100 → 重启后 105）=====
+my.cnf: max_connections=100（配置链默认）；SET PERSIST 后 mysqld-auto.cnf 优先级更高 → 重启后 105（上文已实测）
+mysqld-auto.cnf 当前: {"Version": 2}
+===== MySQL: SESSION 级 sort_buffer_size（连接级，非持久）=====
+g	s
+262144	262144
+g	s
+262144	524288
+--- 新会话（应回到默认 262144）---
+new_sess
+262144

@@ -124,6 +124,8 @@ mysqld（一个 OS 进程）
 实测：`ps -eLf | grep mysqld | wc -l` = **40**（1 主线程 + 连接线程 + InnoDB 后台线程）。
 本机线程名未在 /proc 暴露（comm 均为 mysqld），线程级定位在后续 ENG-001 用 performance_schema 展开（注意本机 P_S=OFF）。
 
+> mysqld 与 mysqld_safe 的角色分工、生命周期与排障路径，见子文章《MySQL 进程模型深度分析：mysqld_safe 与 mysqld 的角色分工》。
+
 ---
 
 ## 4. 两者关键差异（先给结论）

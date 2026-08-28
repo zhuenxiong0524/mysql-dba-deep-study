@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | postgres（postmaster+backend 进程） | mysqld（单进程多线程） | 🔶 | PG 一连接一进程；MySQL 一连接一线程 + InnoDB 后台线程族 | ENV-005 |
 | postgresql.conf | my.cnf + 启动参数 | 🔶 | PG 单文件集中；MySQL 有配置搜索路径 + SET PERSIST(mysqld-auto.cnf) | ENV-006 |
-| pg_settings（SHOW） | SHOW [GLOBAL\|SESSION] VARIABLES / @@var | 🔶 | 作用域模型相近，但 MySQL 无 SET LOCAL，PERSIST 语义不同 | ENV-006 |
+| pg_settings（SHOW） | SHOW [GLOBAL\|SESSION] VARIABLES / @@var | 🔶 | PG 有 context+source+pending_restart；MySQL 无来源列（P_S.variables_info 本机 OFF），无全局 reload | ENV-006 |
 | pg_ctl start/stop/reload | mysqld_safe / mysqladmin shutdown / systemd | 🔶 | 本环境无 systemd 单元，mysqld_safe 托管 | ENV-005 |
 | Role | Account = 'user'@'host' | ❌ | host 是身份一部分，同名不同 host 是不同账号 | ENV-004 |
 | pg_hba.conf | mysql.user host 匹配 + authentication_policy | ❌ | PG 连接来源与认证独立于角色；MySQL 内建于账号 | ENV-004 |
@@ -29,5 +29,5 @@
 | Streaming Replication | Binlog Replication（source→replica） | ❌ | 异步/半同步 + GTID，relay log 中转 | REP-001 |
 | EXPLAIN ANALYZE | EXPLAIN ANALYZE / EXPLAIN TREE | ✅ | 概念类似，格式与字段不同 | OPT-001 |
 | 日志：postgresql.log | error.log + slow_query_log + general_log | 🔶 | error log 最核心；slow log 默认关 | MON-001 |
-| 参数持久化 ALTER SYSTEM | SET PERSIST / SET PERSIST_ONLY | 🔶 | 均写盘（auto.conf vs mysqld-auto.cnf） | UPG-001 |
+| 参数持久化 ALTER SYSTEM | SET PERSIST / SET PERSIST_ONLY | 🔶 | 均写盘（auto.conf vs mysqld-auto.cnf）；PG reload/pending_restart，MySQL 静态参数报 1238 | ENV-006 |
 | 连接池 pgbouncer | thread_cache_size / 连接池 | 🔶 | PG 环境已有 pgbouncer；MySQL 学习实例单实例 | CONN-001 |
