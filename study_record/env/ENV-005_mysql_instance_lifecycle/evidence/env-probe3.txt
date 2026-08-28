@@ -1,0 +1,24 @@
+===== performance_schema 状态 =====
+Variable_name	Value
+performance_schema	OFF
+Variable_name	Value
+innodb_buffer_pool_size	67108864
+Variable_name	Value
+log_bin	ON
+Variable_name	Value
+server_uuid	1709cb6a-a133-11f1-b0cd-000c29951355
+
+===== SHOW PROCESSLIST（P_S OFF 时兜底视图）=====
+Id	User	Host	db	Command	Time	State	Info
+5	event_scheduler	localhost	NULL	Daemon	8192	Waiting on empty queue	NULL
+108	root	localhost	NULL	Sleep	544		NULL
+109	lab_user	localhost	NULL	Sleep	3664		NULL
+128	root	localhost	NULL	Query	0	init	SHOW FULL PROCESSLIST
+
+===== mysqladmin status =====
+Uptime: 8193  Threads: 4  Questions: 578  Slow queries: 0  Opens: 505  Flush tables: 3  Open tables: 411  Queries per second avg: 0.070
+
+===== mysqld 线程总数 =====
+40
+===== PG 后端连接（对比：一连接一进程）=====
+1

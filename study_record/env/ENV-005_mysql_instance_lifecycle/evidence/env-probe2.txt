@@ -1,0 +1,62 @@
+===== systemd 管理状态（mysqld / mysql）=====
+Unit mysqld.service could not be found.
+Unit mysql.service could not be found.
+
+===== mysqld 线程名（InnoDB 后台线程族）=====
+     37 mysqld
+      2 bash
+      1 mysqld_safe
+
+===== error.log: 本次启动关键行 =====
+2026-08-28T01:09:08.956887Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-08-28T01:09:10.010793Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-08-28T01:09:10.697216Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Bind-address: '::' port: 33060, socket: /tmp/mysqlx.sock
+2026-08-28T01:09:10.699933Z 0 [System] [MY-010931] [Server] /usr/local/mysql/mysql-8.4.10/bin/mysqld: ready for connections. Version: '8.4.10'  socket: '/tmp/mysql.sock'  port: 3306  Source distribution.
+2026-08-28T01:09:29.789324Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-08-28T01:09:30.251048Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-08-28T01:09:30.526983Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Bind-address: '::' port: 33060, socket: /tmp/mysqlx.sock
+2026-08-28T01:09:30.527162Z 0 [System] [MY-010931] [Server] /usr/local/mysql/mysql-8.4.10/bin/mysqld: ready for connections. Version: '8.4.10'  socket: '/tmp/mysql.sock'  port: 3306  Source distribution.
+
+===== mysqld_safe.log =====
+2026-08-26T09:47:09.932998Z mysqld_safe Logging to '/data/myhome/mydata/mysql/error.log'.
+2026-08-26T09:47:09.953465Z mysqld_safe Starting mysqld daemon with databases from /data/myhome/mydata/mysql
+2026-08-26T10:04:27.322394Z mysqld_safe mysqld from pid file /data/myhome/mydata/mysql/mysql.pid ended
+
+===== 实例挂了先看什么：pid/socket/error log 定位 =====
+2826
+srwxrwxrwx 1 mysql mysql 0 Aug 28 09:09 /tmp/mysql.sock
+mysqld is alive
+
+===== PG: postgres 用户视角配置 =====
+     data_directory      
+-------------------------
+ /data/pgdata/pgdata18.4
+(1 row)
+
+               config_file               
+-----------------------------------------
+ /data/pgdata/pgdata18.4/postgresql.conf
+(1 row)
+
+ log_directory 
+---------------
+ log
+(1 row)
+
+ port  
+-------
+ 54184
+(1 row)
+
+
+===== PG: 完整进程列表 =====
+/usr/local/pgsql/pgsql18.4/bin/postgres -D /data/pgdata/pgdata18.4   
+postgres: logger    
+postgres: io worker 0  
+postgres: io worker 2  
+postgres: io worker 1  
+postgres: checkpointer    
+postgres: background writer   
+postgres: walwriter    
+postgres: autovacuum launcher   
+postgres: logical replication launcher  

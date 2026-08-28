@@ -2,7 +2,18 @@
 
 PG 18.4 → MySQL 8.4 对照学习记录与文章仓库。
 
-- 任务全集：`learning-roadmap.md`（ENV/MVCC/ISO/REDO/BUF/IDX/OPT/LCK/REP/BAK）
+- 任务全集：`learning-roadmap.md`（ENV/ENG/MVCC/ISO/REDO/BUF/IDX/OPT/MON/CONN/REP/BAK/UPG/SQL/CHA/DR + 生产向执行计划 v0.5）
 - 目录结构：按主题分类，每专题 `<TASK_ID>_<slug>/` 含 `.idx.md`、`evidence/`、对照文章
 - 学习工作流：`.agents/skills/mysql_study/SKILL.md`
-- 首专题：MVCC-001 事务版本链（PG xmin/xmax vs MySQL undo log）
+- 横切资产：
+  - `environment-baseline.md`：环境基线（实例/参数/连接方式）
+  - `pg-mysql-map.md`：PG→MySQL 总映射表（随专题扩展）
+  - `safety.md`：实验安全规范（mysql_lab_*/lab_*/t_* 命名、红线、资源约束）
+  - `runbook/mysql-dba-cheatsheet.md`：生产命令手册（按问题分类）
+  - `troubleshooting/`：故障案例库（CASE-001 ~ CASE-018，结构见 README）
+
+## 已完成
+
+- ENV-004 账号权限体系（对照文章 + 15+ 组实验 + 10 evidence）
+- ENV-005 实例架构与生命周期（生产向 P0，本轮）
+- MYSQL-BASIC-001 基础命令对照（26 类实验 + 22 QA）

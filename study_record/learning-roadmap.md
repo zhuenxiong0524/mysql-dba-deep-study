@@ -32,12 +32,28 @@
 - 实验：information_schema 常用查询对照 pg_catalog
 - 源码：sql/dd/；PG src/include/catalog/
 
-### ENV-004 账号权限体系（S，P2）
-- **状态（2026-08-28）**：✅ 对照文章已产出（`study_record/env/ENV-004_mysql_privilege_system/`，15+ 组实验证据落盘），待审阅/理解验证
+### ENV-004 账号权限体系（S，P2，已完成）
+- **状态（2026-08-28）**：✅ 对照文章 + evidence 已产出并推送（`study_record/env/ENV-004_mysql_privilege_system/`，15+ 组实验；EXP16 空密码/TCP 实测）
 - 实测要点：'user'@'host' 是独立 Account；MySQL 无显式 DENY（库级授权后表级 REVOKE 报 1147）；Role 默认不激活（CURRENT_ROLE()=NONE）；PG 18 中 pg_* 角色名保留
 
 - PG：role/privilege/GRANT；MySQL：mysql.user + 账号权限 + 角色
 - 实验：同权限矩阵两边执行；8.4 默认 caching_sha2_password（PG trust/scram 对照）
+
+### ENV-005 实例架构与生命周期（S，P0，生产向，进行中 2026-08-28）
+- PG 基线：postmaster/backend 进程模型、postgresql.conf、data dir、pg_ctl、error log
+- MySQL：mysqld 单进程多线程（连接线程 + InnoDB 后台线程族）、Server Layer + Storage Engine、datadir 构成
+- 实验：ps/ss/systemctl（本机无 systemd 单元）、@@datadir/@@basedir/@@pid_file/@@log_error、error log 启动日志、P_S=OFF 现状
+- 交付：环境基线 + 实例生命周期文章 + "实例挂了先看哪" 路径
+
+### ENV-006 配置文件与参数体系（M，P0，生产向，未开始）
+- PG：postgresql.conf / ALTER SYSTEM / pg_settings / reload vs restart
+- MySQL：my.cnf 搜索路径、mysqld --verbose --help、GLOBAL/SESSION/PERSIST/PERSIST_ONLY、动态 vs 需重启参数
+- 实验：改参数三张表（在线/仅新连接/需重启）+ SET PERSIST 重启验证
+
+### ENV-007 登录与认证（M，P0，生产向，未开始）
+- PG：Role + pg_hba.conf + trust/md5/scram
+- MySQL：socket/TCP/localhost/IP、user@host 匹配、authentication_policy、caching_sha2_password、.my.cnf/login-path
+- 实验：三种连接路线身份验证（USER()/CURRENT_USER()/CURRENT_ROLE()）；登录失败 Runbook
 
 ## ENG InnoDB 架构（MySQL 独有，无 PG 直接对应）
 
@@ -181,3 +197,63 @@
 - MySQL：mysql 客户端、SHOW 系列、PROCESSLIST、SHOW VARIABLES、user@host、autocommit/DDL 隐式提交
 - 实验：26 类"同命令两边跑"，输出见 study_record/mysql/MYSQL-BASIC-001_pg_vs_mysql_basic/evidence/
 - 交付：对照文章（16 条易踩坑 + 30+ 概念映射表）+ 22 道验证题
+
+
+---
+
+## MySQL 生产 DBA 快速迁移执行计划（v0.5，2026-08-28 追加）
+
+> 目标：以 PG 18.4 为参照系，按 6 阶段快速获得 MySQL 生产接管能力（P0=能运维生产 > P1=能深入分析 >>> P2=专家级）。
+> 与上面专题体系的关系：本计划是"执行顺序与优先级视图"，专题定义以本文件上方案列为准。
+> 每个专题闭环：PG 基线 → MySQL 机制 → 差异 → 同实验两边跑 → evidence → 对照文章 → 更新 pg-mysql-map.md → 汇报（不自动 commit）。
+
+### 第一阶段：敢登录、敢看、不会误操作（P0）
+| 顺序 | 专题 | 任务 ID | 状态 |
+|---|---|---|---|
+| 1 | 实例架构与生命周期 | ENV-005 | 进行中 2026-08-28 |
+| 2 | 配置文件与参数体系 | ENV-006 | 未开始 |
+| 3 | 登录与认证 | ENV-007 | 未开始 |
+| 4 | 账号与权限体系 | ENV-004 | ✅ 已完成 |
+
+### 第二阶段：能理解 MySQL 正在发生什么（P0）
+| 顺序 | 专题 | 任务 ID | 状态 |
+|---|---|---|---|
+| 5 | InnoDB 架构 | ENG-001 | 未开始 |
+| 6 | 表空间/文件/容量 | ENG-002 | 未开始 |
+| 7 | Clustered Index 与回表 | IDX-001 | 未开始 |
+| 8 | 事务/MVCC/Undo | MVCC-001 | 未开始 |
+| 9 | 锁/Gap/Next-Key/死锁 | ISO-001 | 未开始 |
+
+### 第三阶段：数据出问题能恢复（P0）
+| 顺序 | 专题 | 任务 ID | 状态 |
+|---|---|---|---|
+| 10 | Redo/Undo/Binlog 三日志 | REDO-001 + LOG-001 | 未开始 |
+| 11 | Crash Recovery（专用实验实例） | REDO-001 | 未开始 |
+| 12 | Backup/Restore/PITR | BAK-001/002 + LOG-001 | 未开始 |
+
+### 第四阶段：能接主从生产（P0）
+| 顺序 | 专题 | 任务 ID | 状态 |
+|---|---|---|---|
+| 13 | Binlog 主从复制 + GTID | REP-001 | 未开始 |
+| 14 | 复制延迟/中断排查 | REP-001 + MON-001 | 未开始 |
+
+### 第五阶段：能处理性能故障（P0/P1）
+| 顺序 | 专题 | 任务 ID | 状态 |
+|---|---|---|---|
+| 15 | Optimizer/EXPLAIN | OPT-001 | 未开始 |
+| 16 | 组合索引与统计信息 | OPT-001 + IDX-001 | 未开始 |
+| 17 | Performance Schema / 慢 SQL | MON-001（注意：本机 P_S=OFF） | 未开始 |
+| 18 | 连接数/长事务/CPU/IO/磁盘 | CONN-001 + MON-001 + DR-001 | 未开始 |
+
+### 第六阶段：完整生产运维（P0/P1）
+| 顺序 | 专题 | 任务 ID | 状态 |
+|---|---|---|---|
+| 19 | Online DDL 与 MDL | ISO-002 | 未开始 |
+| 20 | HA/Failover | DR-001 + REP-001 | 未开始 |
+
+### 横切资产（随专题持续扩展）
+- study_record/pg-mysql-map.md：PG→MySQL 总映射表
+- study_record/environment-baseline.md：环境基线
+- study_record/safety.md：实验安全规范
+- study_record/runbook/mysql-dba-cheatsheet.md：生产命令手册（按问题分类）
+- study_record/troubleshooting/：故障案例库（CASE-001 Login Failed ... CASE-018 Buffer Pool Pressure）
