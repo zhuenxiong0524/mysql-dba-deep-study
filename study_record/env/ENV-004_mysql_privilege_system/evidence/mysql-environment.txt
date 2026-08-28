@@ -1,0 +1,47 @@
+===== which mysql / mysql --version =====
+/usr/local/bin/mysql
+mysql  Ver 8.4.10 for Linux on x86_64 (Source distribution)
+
+===== which psql / psql --version =====
+/usr/local/pgsql/pgsql18.4/bin/psql
+psql (PostgreSQL) 18.4
+
+===== mysqld process =====
+mysql       2622       1  0 09:09 ?        00:00:00 /bin/sh /usr/local/mysql/mysql-8.4.10/bin/mysqld_safe --defaults-file=/etc/my.cnf
+mysql       2826    2622  0 09:09 ?        00:00:06 /usr/local/mysql/mysql-8.4.10/bin/mysqld --defaults-file=/etc/my.cnf --basedir=/usr/local/mysql/mysql-8.4.10 --datadir=/data/myhome/mydata/mysql --plugin-dir=/usr/local/mysql/mysql-8.4.10/lib/plugin --log-error=/data/myhome/mydata/mysql/error.log --pid-file=/data/myhome/mydata/mysql/mysql.pid --socket=/tmp/mysql.sock --port=3306
+
+===== listening ports 3306/54184 =====
+LISTEN 0      200            0.0.0.0:54184      0.0.0.0:*                                     
+LISTEN 0      70                   *:33060            *:*    users:(("mysqld",pid=2826,fd=18))
+LISTEN 0      200               [::]:54184         [::]:*                                     
+LISTEN 0      100                  *:3306             *:*    users:(("mysqld",pid=2826,fd=21))
+
+===== OS =====
+Linux node01 5.10.0-38-amd64 #1 SMP Debian 5.10.249-1 (2026-02-10) x86_64 GNU/Linux
+PRETTY_NAME="Debian GNU/Linux 11 (bullseye)"
+NAME="Debian GNU/Linux"
+
+===== mysql login test (root, socket) =====
+mysql_version
+8.4.10
+USER()	CURRENT_USER()
+root@localhost	root@localhost
+Database
+cmp
+db_compare
+information_schema
+mysql
+performance_schema
+sys
+
+===== pg login test =====
+                                              version                                              
+---------------------------------------------------------------------------------------------------
+ PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+(1 row)
+
+ current_user | session_user 
+--------------+--------------
+ mysql        | mysql
+(1 row)
+

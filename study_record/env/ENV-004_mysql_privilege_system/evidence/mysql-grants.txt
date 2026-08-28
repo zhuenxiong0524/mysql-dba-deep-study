@@ -1,0 +1,107 @@
+===== EXP3: GRANT SELECT ON mysql_priv_lab.* =====
+Grants for lab_user@localhost
+GRANT USAGE ON *.* TO `lab_user`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.* TO `lab_user`@`localhost`
+
+===== EXP3: login test SELECT (expect SUCCESS) =====
+id	name	department	salary
+1	Alice	DBA	20000.00
+2	Bob	DEV	18000.00
+3	Carol	OPS	16000.00
+
+===== EXP3: login test INSERT (expect FAIL 1142) =====
+ERROR 1142 (42000) at line 1: INSERT command denied to user 'lab_user'@'localhost' for table 'employees'
+
+===== EXP4: GRANT INSERT on mysql_priv_lab.* =====
+Grants for lab_user@localhost
+GRANT USAGE ON *.* TO `lab_user`@`localhost`
+GRANT SELECT, INSERT ON `mysql_priv_lab`.* TO `lab_user`@`localhost`
+
+===== EXP4: login test INSERT (expect SUCCESS now) =====
+cnt
+4
+
+===== EXP5: REVOKE INSERT on mysql_priv_lab.* =====
+Grants for lab_user@localhost
+GRANT USAGE ON *.* TO `lab_user`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.* TO `lab_user`@`localhost`
+
+===== EXP5: login test INSERT (expect FAIL again) =====
+ERROR 1142 (42000) at line 1: INSERT command denied to user 'lab_user'@'localhost' for table 'employees'
+
+===== EXP5: login test SELECT (expect still SUCCESS) =====
+cnt
+4
+===== EXP6: global_user, GRANT CREATE TEMPORARY TABLES ON *.* =====
+Grants for global_user@localhost
+GRANT CREATE TEMPORARY TABLES ON *.* TO `global_user`@`localhost`
+
+===== EXP6: + db-level GRANT SELECT ON mysql_priv_lab.* =====
+Grants for global_user@localhost
+GRANT CREATE TEMPORARY TABLES ON *.* TO `global_user`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.* TO `global_user`@`localhost`
+
+===== EXP6: login test - global priv observable (temp table in any db) + db-level SELECT =====
+x
+1
+emp_cnt
+4
+
+===== EXP7: table_user, table-level GRANT SELECT ON employees =====
+Grants for table_user@localhost
+GRANT USAGE ON *.* TO `table_user`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.`employees` TO `table_user`@`localhost`
+
+===== EXP7: login test employees (expect OK) / departments (expect FAIL 1142) =====
+emp_cnt
+4
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'table_user'@'localhost' for table 'departments'
+
+===== EXP8: column_user, column-level GRANT SELECT(id,name,department) =====
+Grants for column_user@localhost
+GRANT USAGE ON *.* TO `column_user`@`localhost`
+GRANT SELECT (`department`, `id`, `name`) ON `mysql_priv_lab`.`employees` TO `column_user`@`localhost`
+
+===== EXP8: login test partial columns (OK) / salary (FAIL 1143) / SELECT * (FAIL) =====
+id	name	department
+1	Alice	DBA
+2	Bob	DEV
+3	Carol	OPS
+4	Dave	TEST
+ERROR 1143 (42000) at line 1: SELECT command denied to user 'column_user'@'localhost' for column 'salary' in table 'employees'
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'column_user'@'localhost' for table 'employees'
+===== EXP9: mix_user: db-level SELECT first =====
+Grants for mix_user@localhost
+GRANT USAGE ON *.* TO `mix_user`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.* TO `mix_user`@`localhost`
+
+===== EXP9: try table-level REVOKE SELECT ON employees (deny attempt) =====
+
+===== EXP9: login test SELECT employees (db-level still covers it?) =====
+emp_cnt
+4
+id	name
+1	DBA
+2	DEV
+
+===== EXP9: also try REVOKE on a table NEVER granted at table level (no-op check) =====
+
+===== EXP10: grant_admin WITH GRANT OPTION =====
+Grants for grant_admin@localhost
+GRANT USAGE ON *.* TO `grant_admin`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.* TO `grant_admin`@`localhost` WITH GRANT OPTION
+
+===== EXP10: grant_admin grants SELECT on employees (expect OK) =====
+
+===== EXP10: grant_admin tries GRANT INSERT (expect FAIL - not held) =====
+ERROR 1142 (42000) at line 1: INSERT command denied to user 'grant_admin'@'localhost' for table 'employees'
+
+===== EXP10: grant_admin tries GRANT SELECT ON *.* (expect FAIL - wider scope) =====
+ERROR 1045 (28000) at line 1: Access denied for user 'grant_admin'@'localhost' (using password: YES)
+
+===== EXP10: grant_target now has SELECT on employees =====
+Grants for grant_target@localhost
+GRANT USAGE ON *.* TO `grant_target`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.`employees` TO `grant_target`@`localhost`
+emp_cnt
+4

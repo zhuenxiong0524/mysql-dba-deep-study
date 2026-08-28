@@ -1,0 +1,82 @@
+########## PG CATALOG ##########
+===== pg_roles: system roles (pg_%) =====
+           rolname           | rolcanlogin | rolsuper | rolinherit 
+-----------------------------+-------------+----------+------------
+ pg_checkpoint               | f           | f        | t
+ pg_create_subscription      | f           | f        | t
+ pg_database_owner           | f           | f        | t
+ pg_execute_server_program   | f           | f        | t
+ pg_maintain                 | f           | f        | t
+ pg_monitor                  | f           | f        | t
+ pg_read_all_data            | f           | f        | t
+ pg_read_all_settings        | f           | f        | t
+ pg_read_all_stats           | f           | f        | t
+ pg_read_server_files        | f           | f        | t
+ pg_signal_autovacuum_worker | f           | f        | t
+ pg_signal_backend           | f           | f        | t
+ pg_stat_scan_tables         | f           | f        | t
+ pg_use_reserved_connections | f           | f        | t
+ pg_write_all_data           | f           | f        | t
+ pg_write_server_files       | f           | f        | t
+(16 rows)
+
+
+===== information_schema.role_table_grants for employees =====
+   grantee    | privilege_type | is_grantable 
+--------------+----------------+--------------
+ lab_priv_noh | SELECT         | NO
+ lab_reader   | SELECT         | NO
+ postgres     | DELETE         | YES
+ postgres     | INSERT         | YES
+ postgres     | REFERENCES     | YES
+ postgres     | SELECT         | YES
+ postgres     | TRIGGER        | YES
+ postgres     | TRUNCATE       | YES
+ postgres     | UPDATE         | YES
+(9 rows)
+
+
+===== pg_auth_members (role edges) =====
+         role         |    member     | admin_option 
+----------------------+---------------+--------------
+ lab_priv_noh         | lab_user_noh  | f
+ lab_priv_noh         | lab_user_noh2 | f
+ lab_reader           | lab_role_user | f
+ pg_read_all_settings | pg_monitor    | f
+ pg_read_all_stats    | pg_monitor    | f
+ pg_stat_scan_tables  | pg_monitor    | f
+(6 rows)
+
+
+===== pg_authid requires superuser (non-superuser view) =====
+ERROR:  permission denied for table pg_authid
+
+########## TROUBLESHOOTING CASE 1 ##########
+===== Case1: fresh user no grants: login OK, SELECT denied =====
+--- login OK ---
+USER()	CURRENT_USER()	CURRENT_ROLE()
+trouble1@localhost	trouble1@localhost	NONE
+--- SQL denied ---
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'trouble1'@'localhost' for table 'employees'
+--- diagnosis: SHOW GRANTS ---
+Grants for trouble1@localhost
+GRANT USAGE ON *.* TO `trouble1`@`localhost`
+
+########## TROUBLESHOOTING CASE 2 ##########
+===== Case2: role granted but NOT activated =====
+--- login OK, SELECT denied ---
+USER()	CURRENT_USER()	CURRENT_ROLE()
+trouble2@localhost	trouble2@localhost	NONE
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'trouble2'@'localhost' for table 'employees'
+--- diagnosis: SHOW GRANTS shows role grant only, CURRENT_ROLE()=NONE ---
+Grants for trouble2@localhost
+GRANT USAGE ON *.* TO `trouble2`@`localhost`
+GRANT `role_reader`@`%` TO `trouble2`@`localhost`
+--- fix: SET ROLE ---
+CURRENT_ROLE()
+`role_reader`@`%`
+id	name	department	salary
+1	Alice	DBA	20000.00
+2	Bob	DEV	18000.00
+3	Carol	OPS	16000.00
+4	Dave	TEST	15000.00

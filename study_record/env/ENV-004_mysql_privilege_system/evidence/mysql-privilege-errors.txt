@@ -1,0 +1,24 @@
+===== ERROR CODE COLLECTION =====
+--- AUTH failure: wrong password (ERROR 1045) ---
+ERROR 1045 (28000): Access denied for user 'lab_user'@'localhost' (using password: YES)
+
+--- AUTH failure: user does not exist (ERROR 1045) ---
+ERROR 1045 (28000): Access denied for user 'nobody_user'@'localhost' (using password: YES)
+
+--- AUTHZ failure: SELECT denied (ERROR 1142) ---
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'trouble1'@'localhost' for table 'employees'
+
+--- AUTHZ failure: column denied (ERROR 1143) ---
+ERROR 1143 (42000) at line 1: SELECT command denied to user 'column_user'@'localhost' for column 'salary' in table 'employees'
+
+--- GRANT failure: no such grant defined (ERROR 1147) ---
+ERROR 1147 (42000) at line 1: There is no such grant defined for user 'mix_user' on host 'localhost' on table 'departments'
+
+--- GRANT failure: not held privilege (ERROR 1142) ---
+ERROR 1142 (42000) at line 1: INSERT command denied to user 'grant_admin'@'localhost' for table 'employees'
+
+--- GRANT failure: wider scope than held (ERROR 1045) ---
+ERROR 1045 (28000) at line 1: Access denied for user 'grant_admin'@'localhost' (using password: YES)
+
+--- DB-level denied: CREATE DATABASE as non-priv user ---
+ERROR 1044 (42000) at line 1: Access denied for user 'global_user'@'localhost' to database 'hack_db'

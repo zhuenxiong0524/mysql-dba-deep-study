@@ -1,0 +1,20 @@
+===== EXP15: setup - lab_user@localhost has SELECT, lab_user@% has NONE =====
+Grants for lab_user@localhost
+GRANT USAGE ON *.* TO `lab_user`@`localhost`
+GRANT SELECT ON `mysql_priv_lab`.* TO `lab_user`@`localhost`
+Grants for lab_user@%
+GRANT USAGE ON *.* TO `lab_user`@`%`
+
+===== EXP14+15: login via SOCKET (matches @localhost) =====
+USER()	CURRENT_USER()	CURRENT_ROLE()
+lab_user@localhost	lab_user@localhost	NONE
+emp_cnt
+4
+
+===== EXP14+15: login via TCP 127.0.0.1 (matches @% account, different password) =====
+USER()	CURRENT_USER()	CURRENT_ROLE()
+lab_user@127.0.0.1	lab_user@%	NONE
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'lab_user'@'127.0.0.1' for table 'employees'
+
+===== EXP15: wrong password for the host account actually matched =====
+ERROR 1045 (28000): Access denied for user 'lab_user'@'127.0.0.1' (using password: YES)

@@ -1,0 +1,172 @@
+===== PG: pg_hba.conf relevant lines =====
+host    all             all             192.168.101.0/24        md5
+host    replication     replica         192.168.101.0/24        trust
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            trust
+host    all             all             ::1/128                 trust
+local   replication     all                                     trust
+host    replication     all             127.0.0.1/32            trust
+host    replication     all             ::1/128                 trust
+
+===== PG: create roles + grants =====
+NOTICE:  role "pg_role_user" does not exist, skipping
+NOTICE:  role "pg_reader" does not exist, skipping
+DROP ROLE
+DROP ROLE
+ERROR:  role name "pg_reader" is reserved
+DETAIL:  Role names starting with "pg_" are reserved.
+
+===== PG: pg_roles for lab roles =====
+ rolname | rolcanlogin | rolsuper | rolcreatedb | rolinherit 
+---------+-------------+----------+-------------+------------
+(0 rows)
+
+
+===== PG: role membership (pg_auth_members) =====
+         role         |   member   
+----------------------+------------
+ pg_read_all_settings | pg_monitor
+ pg_read_all_stats    | pg_monitor
+ pg_stat_scan_tables  | pg_monitor
+(3 rows)
+
+
+===== PG: login as pg_role_user, SELECT test (INHERIT default -> expect OK) =====
+psql: error: connection to server at "127.0.0.1", port 54184 failed: FATAL:  role "pg_role_user" does not exist
+
+===== PG: SET ROLE pg_reader =====
+psql: error: connection to server at "127.0.0.1", port 54184 failed: FATAL:  role "pg_role_user" does not exist
+
+===== PG: NOINHERIT demo (parallel to MySQL role activation) =====
+NOTICE:  role "pg_priv_noh" does not exist, skipping
+NOTICE:  role "pg_user_noh" does not exist, skipping
+DROP ROLE
+DROP ROLE
+ERROR:  role name "pg_priv_noh" is reserved
+DETAIL:  Role names starting with "pg_" are reserved.
+psql: error: connection to server at "127.0.0.1", port 54184 failed: FATAL:  role "pg_user_noh" does not exist
+psql: error: connection to server at "127.0.0.1", port 54184 failed: FATAL:  role "pg_user_noh" does not exist
+===== PG: create roles + grants (lab_ prefix; pg_* is RESERVED in PG18) =====
+NOTICE:  role "lab_role_user" does not exist, skipping
+NOTICE:  role "lab_reader" does not exist, skipping
+NOTICE:  role "lab_user_noh" does not exist, skipping
+DROP ROLE
+NOTICE:  role "lab_priv_noh" does not exist, skipping
+DROP ROLE
+DROP ROLE
+DROP ROLE
+CREATE ROLE
+GRANT
+GRANT
+GRANT
+CREATE ROLE
+GRANT ROLE
+
+===== PG: pg_roles for lab roles =====
+    rolname    | rolcanlogin | rolsuper | rolcreatedb | rolinherit 
+---------------+-------------+----------+-------------+------------
+ lab_reader    | f           | f        | f           | t
+ lab_role_user | t           | f        | f           | t
+(2 rows)
+
+
+===== PG: role membership (pg_auth_members, filtered) =====
+    role    |    member     
+------------+---------------
+ lab_reader | lab_role_user
+(1 row)
+
+
+===== PG: login as lab_role_user, SELECT test (INHERIT default -> expect OK) =====
+ current_user  | session_user  
+---------------+---------------
+ lab_role_user | lab_role_user
+(1 row)
+
+ id | name  | department |  salary  
+----+-------+------------+----------
+  1 | Alice | DBA        | 20000.00
+  2 | Bob   | DEV        | 18000.00
+  3 | Carol | OPS        | 16000.00
+(3 rows)
+
+
+===== PG: SET ROLE lab_reader =====
+SET
+ current_user 
+--------------
+ lab_reader
+(1 row)
+
+ id | name  | department |  salary  
+----+-------+------------+----------
+  1 | Alice | DBA        | 20000.00
+  2 | Bob   | DEV        | 18000.00
+  3 | Carol | OPS        | 16000.00
+(3 rows)
+
+
+===== PG: NOINHERIT demo (parallel to MySQL role activation) =====
+CREATE ROLE
+GRANT
+CREATE ROLE
+GRANT ROLE
+--- as lab_user_noh (expect FAIL without SET ROLE) ---
+ id | name  | department |  salary  
+----+-------+------------+----------
+  1 | Alice | DBA        | 20000.00
+  2 | Bob   | DEV        | 18000.00
+  3 | Carol | OPS        | 16000.00
+(3 rows)
+
+--- as lab_user_noh after SET ROLE (expect OK) ---
+SET
+ id | name  | department |  salary  
+----+-------+------------+----------
+  1 | Alice | DBA        | 20000.00
+  2 | Bob   | DEV        | 18000.00
+  3 | Carol | OPS        | 16000.00
+(3 rows)
+
+===== PG: correct NOINHERIT - on MEMBER role =====
+NOTICE:  role "lab_user_noh2" does not exist, skipping
+DROP ROLE
+CREATE ROLE
+GRANT ROLE
+     role     |    member     | rolinherit 
+--------------+---------------+------------
+ lab_priv_noh | lab_user_noh  | t
+ lab_priv_noh | lab_user_noh2 | f
+(2 rows)
+
+--- as lab_user_noh2 (NOINHERIT member, expect FAIL without SET ROLE) ---
+ current_user  
+---------------
+ lab_user_noh2
+(1 row)
+
+ERROR:  permission denied for table employees
+--- as lab_user_noh2 after SET ROLE lab_priv_noh (expect OK) ---
+SET
+ current_user 
+--------------
+ lab_priv_noh
+(1 row)
+
+ id | name  | department |  salary  
+----+-------+------------+----------
+  1 | Alice | DBA        | 20000.00
+  2 | Bob   | DEV        | 18000.00
+  3 | Carol | OPS        | 16000.00
+(3 rows)
+
+
+===== PG: revoke table-level SELECT from lab_reader (PG has no db-level cover) =====
+REVOKE
+ grantee | privilege_type 
+---------+----------------
+(0 rows)
+
+ERROR:  permission denied for table employees
+--- restore ---
+GRANT

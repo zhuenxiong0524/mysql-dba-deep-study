@@ -33,6 +33,9 @@
 - 源码：sql/dd/；PG src/include/catalog/
 
 ### ENV-004 账号权限体系（S，P2）
+- **状态（2026-08-28）**：✅ 对照文章已产出（`study_record/env/ENV-004_mysql_privilege_system/`，15+ 组实验证据落盘），待审阅/理解验证
+- 实测要点：'user'@'host' 是独立 Account；MySQL 无显式 DENY（库级授权后表级 REVOKE 报 1147）；Role 默认不激活（CURRENT_ROLE()=NONE）；PG 18 中 pg_* 角色名保留
+
 - PG：role/privilege/GRANT；MySQL：mysql.user + 账号权限 + 角色
 - 实验：同权限矩阵两边执行；8.4 默认 caching_sha2_password（PG trust/scram 对照）
 

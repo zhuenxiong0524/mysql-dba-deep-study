@@ -1,0 +1,171 @@
+===== EXP13: mysql schema tables (privilege-related) =====
+columns_priv
+db
+default_roles
+func
+global_grants
+innodb_index_stats
+innodb_table_stats
+ndb_binlog_index
+procs_priv
+proxies_priv
+role_edges
+tables_priv
+user
+
+===== EXP13: DESC mysql.user (key columns) =====
+Field	Type
+Host	char(255)
+User	char(32)
+Select_priv	enum('N','Y')
+Insert_priv	enum('N','Y')
+Update_priv	enum('N','Y')
+Delete_priv	enum('N','Y')
+Create_priv	enum('N','Y')
+Drop_priv	enum('N','Y')
+Reload_priv	enum('N','Y')
+Shutdown_priv	enum('N','Y')
+Process_priv	enum('N','Y')
+File_priv	enum('N','Y')
+Grant_priv	enum('N','Y')
+References_priv	enum('N','Y')
+Index_priv	enum('N','Y')
+Alter_priv	enum('N','Y')
+Show_db_priv	enum('N','Y')
+Super_priv	enum('N','Y')
+Create_tmp_table_priv	enum('N','Y')
+Lock_tables_priv	enum('N','Y')
+Execute_priv	enum('N','Y')
+Repl_slave_priv	enum('N','Y')
+Repl_client_priv	enum('N','Y')
+Create_view_priv	enum('N','Y')
+Show_view_priv	enum('N','Y')
+Create_routine_priv	enum('N','Y')
+Alter_routine_priv	enum('N','Y')
+Create_user_priv	enum('N','Y')
+Event_priv	enum('N','Y')
+Trigger_priv	enum('N','Y')
+Create_tablespace_priv	enum('N','Y')
+ssl_type	enum('','ANY','X509','SPECIFIED')
+ssl_cipher	blob
+x509_issuer	blob
+x509_subject	blob
+max_questions	int unsigned
+max_updates	int unsigned
+max_connections	int unsigned
+max_user_connections	int unsigned
+plugin	char(64)
+authentication_string	text
+password_expired	enum('N','Y')
+password_last_changed	timestamp
+password_lifetime	smallint unsigned
+account_locked	enum('N','Y')
+Create_role_priv	enum('N','Y')
+Drop_role_priv	enum('N','Y')
+Password_reuse_history	smallint unsigned
+Password_reuse_time	smallint unsigned
+Password_require_current	enum('N','Y')
+User_attributes	json
+
+===== EXP13: mysql.user row for lab_user (safe columns only) =====
+user	host	plugin	account_locked	password_expired
+lab_user	%	caching_sha2_password	N	N
+lab_user	localhost	caching_sha2_password	N	N
+root	localhost	caching_sha2_password	N	N
+
+===== EXP13: DESC mysql.db =====
+Field	Type
+Host	char(255)
+Db	char(64)
+User	char(32)
+Select_priv	enum('N','Y')
+Insert_priv	enum('N','Y')
+Update_priv	enum('N','Y')
+Delete_priv	enum('N','Y')
+Create_priv	enum('N','Y')
+Drop_priv	enum('N','Y')
+Grant_priv	enum('N','Y')
+References_priv	enum('N','Y')
+Index_priv	enum('N','Y')
+Alter_priv	enum('N','Y')
+Create_tmp_table_priv	enum('N','Y')
+Lock_tables_priv	enum('N','Y')
+Create_view_priv	enum('N','Y')
+Show_view_priv	enum('N','Y')
+Create_routine_priv	enum('N','Y')
+Alter_routine_priv	enum('N','Y')
+Execute_priv	enum('N','Y')
+Event_priv	enum('N','Y')
+Trigger_priv	enum('N','Y')
+
+===== EXP13: mysql.db rows for mysql_priv_lab =====
+Host	Db	User	Select_priv	Insert_priv
+%	mysql_priv_lab	role_reader	Y	N
+localhost	mysql_priv_lab	global_user	Y	N
+localhost	mysql_priv_lab	grant_admin	Y	N
+localhost	mysql_priv_lab	lab_user	Y	N
+localhost	mysql_priv_lab	mix_user	Y	N
+
+===== EXP13: DESC tables_priv / columns_priv =====
+Field	Type
+Host	char(255)
+Db	char(64)
+User	char(32)
+Table_name	char(64)
+Grantor	varchar(288)
+Timestamp	timestamp
+Table_priv	set('Select','Insert','Update','Delete','Create','Drop','Grant','References','Index','Alter','Create View','Show view','Trigger')
+Column_priv	set('Select','Insert','Update','References')
+Field	Type
+Host	char(255)
+Db	char(64)
+User	char(32)
+Table_name	char(64)
+Column_name	char(64)
+Timestamp	timestamp
+Column_priv	set('Select','Insert','Update','References')
+
+===== EXP13: tables_priv / columns_priv rows for lab =====
+Host	Db	User	Table_name	Grantor
+localhost	mysql_priv_lab	grant_target	employees	grant_admin@localhost
+localhost	mysql_priv_lab	column_user	employees	root@localhost
+localhost	mysql_priv_lab	table_user	employees	root@localhost
+Host	Db	User	Table_name	Column_name
+localhost	mysql_priv_lab	column_user	employees	department
+localhost	mysql_priv_lab	column_user	employees	id
+localhost	mysql_priv_lab	column_user	employees	name
+
+===== EXP13: role_edges / default_roles =====
+FROM_HOST	FROM_USER	TO_HOST	TO_USER	WITH_ADMIN_OPTION
+%	role_reader	localhost	role_user	N
+HOST	USER	DEFAULT_ROLE_HOST	DEFAULT_ROLE_USER
+localhost	role_user	%	role_reader
+
+===== EXP13: procs_priv exists? =====
+Tables_in_mysql (procs_priv)
+procs_priv
+===== ROUTINE LEVEL: create procedure, grant EXECUTE =====
+Grants for routine_user@localhost
+GRANT USAGE ON *.* TO `routine_user`@`localhost`
+GRANT EXECUTE ON PROCEDURE `mysql_priv_lab`.`count_emps` TO `routine_user`@`localhost`
+
+===== ROUTINE: routine_user can CALL, cannot SELECT table =====
+COUNT(*)
+4
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'routine_user'@'localhost' for table 'employees'
+
+===== procs_priv row =====
+Host	Db	User	Routine_name	Proc_priv	Grantor
+localhost	mysql_priv_lab	routine_user	count_emps	Execute	root@localhost
+
+===== SHOW DATABASES: user with only db-level SELECT sees the db =====
+Database
+cmp
+db_compare
+db_compare2
+demo_schema
+information_schema
+mysql
+mysql_priv_lab
+performance_schema
+sys

@@ -1,0 +1,46 @@
+===== EXP11: create role_reader, grant SELECT on mysql_priv_lab.* =====
+Grants for role_reader@%
+GRANT USAGE ON *.* TO `role_reader`@`%`
+GRANT SELECT ON `mysql_priv_lab`.* TO `role_reader`@`%`
+
+===== EXP11: create role_user, GRANT role to user =====
+Grants for role_user@localhost
+GRANT USAGE ON *.* TO `role_user`@`localhost`
+GRANT `role_reader`@`%` TO `role_user`@`localhost`
+
+===== EXP11: role_user login - SELECT test + CURRENT_ROLE (expect NULL, SELECT FAIL) =====
+USER()	CURRENT_USER()	CURRENT_ROLE()
+role_user@localhost	role_user@localhost	NONE
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'role_user'@'localhost' for table 'employees'
+
+===== EXP11: SET ROLE 'role_reader' then test =====
+CURRENT_ROLE()
+NONE
+CURRENT_ROLE()
+`role_reader`@`%`
+id	name	department	salary
+1	Alice	DBA	20000.00
+2	Bob	DEV	18000.00
+3	Carol	OPS	16000.00
+4	Dave	TEST	15000.00
+
+===== EXP12: SET DEFAULT ROLE then relogin =====
+*************************** 1. row ***************************
+             HOST: localhost
+             USER: role_user
+DEFAULT_ROLE_HOST: %
+DEFAULT_ROLE_USER: role_reader
+
+===== EXP12: role_user fresh login - role auto-activated? =====
+CURRENT_ROLE()
+`role_reader`@`%`
+id	name	department	salary
+1	Alice	DBA	20000.00
+2	Bob	DEV	18000.00
+3	Carol	OPS	16000.00
+4	Dave	TEST	15000.00
+
+===== EXP12: SET ROLE NONE to deactivate =====
+CURRENT_ROLE()
+NONE
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'role_user'@'localhost' for table 'employees'

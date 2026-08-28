@@ -1,0 +1,41 @@
+===== MySQL: CREATE DATABASE mysql_priv_lab =====
+id	name	department	salary
+1	Alice	DBA	20000.00
+2	Bob	DEV	18000.00
+3	Carol	OPS	16000.00
+id	name
+1	DBA
+2	DEV
+
+===== PG: CREATE DATABASE pg_priv_lab =====
+ datname 
+---------
+(0 rows)
+
+===== PG: create table employees + seed =====
+NOTICE:  table "employees" does not exist, skipping
+DROP TABLE
+ERROR:  permission denied for schema public
+LINE 1: DROP TABLE IF EXISTS employees; CREATE TABLE employees (id i...
+                                                     ^
+
+===== PG: owner / privileges check =====
+ current_user 
+--------------
+ mysql
+(1 row)
+
+ tableowner 
+------------
+(0 rows)
+
+===== PG: create table as postgres =====
+CREATE TABLE
+INSERT 0 3
+ id | name  | department |  salary  
+----+-------+------------+----------
+  1 | Alice | DBA        | 20000.00
+  2 | Bob   | DEV        | 18000.00
+  3 | Carol | OPS        | 16000.00
+(3 rows)
+

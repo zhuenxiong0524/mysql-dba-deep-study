@@ -1,0 +1,36 @@
+===== EXP1: CREATE USER 'lab_user'@'localhost' =====
+user	host	plugin
+lab_user	localhost	caching_sha2_password
+
+===== EXP1: CREATE USER 'lab_user'@'%' (same username, different host) =====
+user	host	plugin
+lab_user	%	caching_sha2_password
+lab_user	localhost	caching_sha2_password
+
+===== EXP1: SHOW GRANTS both accounts =====
+Grants for lab_user@localhost
+GRANT USAGE ON *.* TO `lab_user`@`localhost`
+Grants for lab_user@%
+GRANT USAGE ON *.* TO `lab_user`@`%`
+
+===== EXP1: are they independent accounts? create/drop one, other survives =====
+user	host
+lab_user	localhost
+user	host
+lab_user	%
+lab_user	localhost
+===== EXP2: login as lab_user (socket -> @localhost account) =====
+USER()	CURRENT_USER()
+lab_user@localhost	lab_user@localhost
+Grants for lab_user@localhost
+GRANT USAGE ON *.* TO `lab_user`@`localhost`
+
+===== EXP2: SELECT from mysql_priv_lab.employees (expect FAIL) =====
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'lab_user'@'localhost' for table 'employees'
+
+===== EXP2: can the user even see the database in SHOW DATABASES? =====
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Database
+information_schema
+performance_schema
