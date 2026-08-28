@@ -536,6 +536,36 @@ mysql -ulab_user -p'LabPass_123!' -h 127.0.0.1 --protocol=TCP
 
 **PostgreSQL 对比**：PG 没有 host 维度的身份分裂——`session_user` 固定为连接角色，`current_user` 随 `SET ROLE` 变化；来源只影响认证方式（hba），不影响角色身份。
 
+### 12.1 补充实验（EXP16）：空密码不限制连接路线，Account 匹配才决定登录
+
+**背景**：本实例 root@localhost 是空密码（`--initialize-insecure` 初始化），socket 可登录、TCP 登录失败。起初容易归因为"MySQL 禁止 TCP + 空密码"，实测结论相反。
+
+**执行 SQL**：创建三个空密码账号，分别走三种连接路线。
+
+```sql
+CREATE USER 'empty_test'@'localhost'  IDENTIFIED BY '';
+CREATE USER 'empty_test'@'127.0.0.1' IDENTIFIED BY '';
+CREATE USER 'empty_test'@'%'         IDENTIFIED BY '';
+SELECT user, host, LENGTH(authentication_string) FROM mysql.user WHERE user='empty_test';
+-- 三行 auth_str_len 均为 0（空密码）
+```
+
+**实际输出**：
+```text
+1) socket              → empty_test@localhost        CURRENT_USER=empty_test@localhost    ✅
+2) TCP 127.0.0.1       → empty_test@127.0.0.1        CURRENT_USER=empty_test@127.0.0.1    ✅
+3) TCP 192.168.101.129 → empty_test@192.168.101.129  CURRENT_USER=empty_test@%            ✅
+对照: root 只有 @localhost 一个 Account
+      mysql -uroot -h 127.0.0.1 → ERROR 1045 (28000): Access denied for user 'root'@'127.0.0.1' (using password: NO)
+```
+
+**结论**：
+- MySQL **没有**"空密码禁止 TCP"的全局规则；空密码 + TCP 只要 Account 匹配就能登录（三条路线全部成功）。
+- root TCP 失败的真正原因：实例开启 `skip-name-resolve`，TCP 连接按 IP 匹配 host（`127.0.0.1` / `192.168.101.129`），`'root'@'localhost'` 只匹配 socket；且不存在 `root@'127.0.0.1'` 或 `root@'%'` 兜底 → 无 Account 可匹配 → 1045。
+- 心智模型：**能走通几条连接路线 = 存在几个匹配的 Account**；`localhost` 这个 host 只在 socket 连接时出现。
+
+**DBA 意义**：远程登录失败先查"有没有匹配该来源 host 的 Account"，而不是先怀疑全局策略；空密码账号只要匹配也会从 TCP 进来，运维上"空密码 + `%`"风险极高，宁可只保留 `@localhost`。
+
 ---
 
 ## 13. PostgreSQL Role 模型对照（PG 侧实验）
