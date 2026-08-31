@@ -1,6 +1,7 @@
 # MySQL 进程模型深度分析：mysqld_safe 与 mysqld 的角色分工
 
-> 版本：v1.0（2026-08-28，实机验证 + 源码脚本走读）
+> 版本：v1.1（2026-08-31，新增第 8 节：启动方式对比）
+> 初版：v1.0（2026-08-28，实机验证 + 源码脚本走读）
 > 位置：ENV-005（实例架构与生命周期）专题子文章
 > 关联：主文章《MySQL 实例架构与生命周期：从 PostgreSQL DBA 视角理解 mysqld》第 3.3 节
 > 依据：本机 `ps` 进程树实测 + `/usr/local/mysql/mysql-8.4.10/bin/mysqld_safe` 脚本源码走读 + 受控重启实验日志
@@ -215,7 +216,56 @@ mysqld --defaults-file=/etc/my.cnf --basedir=/usr/local/mysql/mysql-8.4.10
 
 ---
 
-## 8. 排障路径："进程怎么又起来了？"
+## 8. 启动方式：mysqld_safe 托管 vs 裸启动
+
+### 8.1 本机三种启动命令（实测）
+
+**方式 A：mysqld_safe（当前实例在用，推荐常驻）**
+
+```bash
+sudo -u mysql setsid nohup /usr/local/mysql/mysql-8.4.10/bin/mysqld_safe \
+  --defaults-file=/etc/my.cnf >/tmp/mysqld_safe.log 2>&1 < /dev/null &
+```
+
+说明：`setsid nohup` 是为了脱离当前会话，防止终端关闭把守护进程带走（本项目第一轮实测踩过的坑——普通后台方式随 exec 会话退出被 SIGHUP 带走）。
+
+**方式 B：裸启动前台（排障用）**
+
+```bash
+sudo -u mysql /usr/local/mysql/mysql-8.4.10/bin/mysqld --defaults-file=/etc/my.cnf
+```
+
+说明：前台运行，启动错误直接打到终端；Ctrl-C 或终端关闭会带走进程（无 nohup/setsid 保护时）。
+
+**方式 C：裸启动 + --daemonize（8.4 实测支持）**
+
+```bash
+sudo -u mysql /usr/local/mysql/mysql-8.4.10/bin/mysqld --defaults-file=/etc/my.cnf --daemonize
+```
+
+说明：`mysqld --verbose --help` 实测存在 `-D, --daemonize  Run mysqld as sysv daemon`；只解决"后台化"，不解决"崩溃自动重启"。
+
+### 8.2 区别对比表
+
+| 维度 | mysqld_safe（守护脚本） | 裸启动 mysqld |
+|---|---|---|
+| 进程形态 | 常驻 shell 守护 + mysqld 子进程 | 只有 mysqld 一个进程 |
+| 前台/后台 | 自动后台（nohup） | 默认前台（终端被占用）；`--daemonize` 才后台 |
+| 崩溃自动重启 | ✅ 主循环自动拉起（"mysqld restarted"） | ❌ 挂了就挂了 |
+| 日志去向 | 重定向到 `--log-error` 文件 | 默认打终端 stderr；有 `--log-error` 才写文件 |
+| 终端关闭影响 | `trap 1 2 3 15` + nohup 防杀 | 前台裸跑会被 SIGHUP 带走（需 nohup/setsid 保护） |
+| 快速重启节流 | ✅ 5 次/秒后 sleep 1 | ❌ |
+| 双实例防护 | ✅ pid 文件检查，"already running. Aborting!!" | ❌ 不检查，可能互相踩 datadir |
+| `RESTART` 语句 | ✅ 支持（mysqld 退出码 16 由它拉起） | ❌ 无效（mysqld 直接退出） |
+| 适用场景 | 生产/学习环境常驻 | 排障看启动报错、容器（由编排管） |
+
+### 8.3 运维要点
+
+- 停库统一用 `mysqladmin shutdown`（裸启动也可 Ctrl-C），**不要 `kill -9`**——mysqld_safe 托管下 `kill -9 mysqld` 会被它秒拉回
+- mysqld 反复起不来 → 裸启动前台跑，启动错误直接打终端，比翻日志直观
+- `--daemonize` 只解决后台化，不解决崩溃自动重启——裸启动就是没有守护，生产上要么 mysqld_safe、要么 systemd/CM
+
+## 9. 排障路径："进程怎么又起来了？"
 
 ```text
 现象:  mysqld 进程反复出现 / 想停停不下来
@@ -235,17 +285,18 @@ mysqld --defaults-file=/etc/my.cnf --basedir=/usr/local/mysql/mysql-8.4.10
 
 ---
 
-## 9. 常见误区
+## 10. 常见误区
 
 - ❌ "mysqld_safe 是数据库服务" → 是 shell 守护脚本，服务本体是 mysqld
 - ❌ "kill -9 mysqld 能停库" → mysqld_safe 会立刻拉起（除非先停守护）
 - ❌ "RESTART 是重启 mysqld_safe" → 是让 mysqld 以退出码 16 退出，由 mysqld_safe 完成重启
 - ❌ "两个进程都要 systemctl 管" → 本机根本没有 systemd 单元；托管方式先确认
 - ❌ "mysqld_safe 会无限重启" → 有节流（5 次快速重启后 sleep 1），且 `pid_file.shutdown` 标记可阻止重启
+- ❌ "裸启动和 mysqld_safe 一样" → 裸启动无守护/无自动重启/日志打终端/会被 SIGHUP 带走；`--daemonize` 只解决后台化
 
 ---
 
-## 10. 心智模型总结
+## 11. 心智模型总结
 
 ```text
 mysqld_safe（常驻 shell 监护）          mysqld（服务本体）
@@ -263,7 +314,7 @@ mysqld_safe（常驻 shell 监护）          mysqld（服务本体）
 
 ---
 
-## 11. Evidence 与参考
+## 12. Evidence 与参考
 
 - 本机 `ps -ef | grep mysqld`（进程树）→ `study_record/env/ENV-005_mysql_instance_lifecycle/evidence/env-probe.txt`
 - 受控重启实验（shutdown → 双方退出 → 拉起 → ready for connections）→ `evidence/env-probe2.txt` / `mysql-config.txt`
