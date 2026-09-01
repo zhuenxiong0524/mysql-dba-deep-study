@@ -140,10 +140,32 @@ SELECT VARIABLE_NAME, VARIABLE_SOURCE, VARIABLE_PATH, SET_TIME, SET_USER
 
 ## 待填充（随专题扩展）
 
-- 数据库/表大小 → BAK/ENG-002
 - 长事务/锁等待/deadlock → ISO-001/MON-001
 - Buffer Pool/Redo 状态 → BUF-001/REDO-001
 - Binlog/复制状态 → LOG-001/REP-001
 - 慢 SQL → MON-001
 - CPU/IO/磁盘 → MON-001/DR-001
 - 备份恢复 → BAK-001/002
+
+## 磁盘空间 / 表大小（ENG-002 实测）
+
+```sql
+-- 所有 InnoDB 表空间文件（P_S=OFF 也可用）：General=mysql.ibd / Single=*.ibd / Undo=undo_* / System=ibtmp1
+SELECT SPACE, NAME, SPACE_TYPE, FILE_SIZE, ALLOCATED_SIZE
+  FROM information_schema.INNODB_TABLESPACES ORDER BY FILE_SIZE DESC;
+-- 按库/表看逻辑大小（data_length+index_length ≈ 表数据+索引）
+SELECT table_schema, table_name, engine, ROUND((data_length+index_length)/1024/1024,2) AS mb
+  FROM information_schema.tables ORDER BY mb DESC;
+```
+
+```bash
+du -sh /data/myhome/mydata/mysql/*/*.ibd | sort -h | tail     # 物理大户（.ibd 一眼可读）
+ls -lh /data/myhome/mydata/mysql/#innodb_redo/               # redo 目录（容量=innodb_redo_log_capacity）
+du -sh /data/myhome/mydata/mysql/undo_00*                    # undo 膨胀（长事务撑大，等 purge）
+ls -lh /data/myhome/mydata/mysql/binlog.* | tail             # binlog 保留
+```
+
+空间回收行为（实测结论）：
+- DELETE 只标记删除，`.ibd` 不缩小 → 回收用 `OPTIMIZE TABLE 库.表;`（= ALTER 重建，会锁表，低峰做）
+- 清空表用 `TRUNCATE TABLE 库.表;`（重建 `.ibd` 回初始 7 页 ≈ 114688 bytes，非 0）
+- 8.4 的 `ibdata1` 不再装数据字典（字典在 `mysql.ibd`），一般不会无限膨胀

@@ -22,6 +22,8 @@
 | shared_buffers | innodb_buffer_pool_size | 🔶 | 均缓存数据页；MySQL 还有 log buffer/双写/自适应哈希 | BUF-001 |
 | Heap table | Clustered Index（主键即数据） | ❌ | 二级索引携带主键回表，PG 索引存 TID 回堆 | IDX-001 |
 | WAL | InnoDB Redo + Binlog | ❌ | 双日志体系：redo 崩溃恢复 / binlog 复制+PITR | REDO-001/LOG-001 |
+| 表文件（base/<oid>/<relfilenode>） | 库名/表.ibd（file-per-table） | 🔶 | PG 文件是裸数字 relfilenode；MySQL 文件名一眼可读；8.4 字典在 mysql.ibd、ibdata1 不再膨胀 | ENG-002 |
+| VACUUM (FULL) / TRUNCATE | OPTIMIZE TABLE / TRUNCATE TABLE | 🔶 | 都重写/换文件；PG VACUUM FULL=CLUSTER 变体，MySQL OPTIMIZE=ALTER 重建；TRUNCATE 都回到初始文件 | ENG-002 |
 | VACUUM / autovacuum | Purge 线程 + history list | ❌ | PG 原地清理旧版本；InnoDB undo 链 + 后台 purge | MVCC-001 |
 | Tuple 版本链（xmin/xmax） | undo log + roll_ptr 版本链 | 🔶 | 机制类似（多版本），实现和清理完全不同 | MVCC-001 |
 | pg_locks | performance_schema.data_locks（或 innodb_status） | 🔶 | PG 系统表实时；MySQL P_S 表（本机 OFF，需另开） | ISO-001 |

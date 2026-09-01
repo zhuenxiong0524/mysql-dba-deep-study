@@ -1,0 +1,47 @@
+
+===== 0. 确认 file-per-table 与建 lab 库表 =====
+file_per_table	page_size
+1	16384
+
+===== 1. 表空间与数据文件定位 =====
+tablespace	SPACE_TYPE	FILE_SIZE	PATH
+mysql_lab_eng002/lab_files	Single	114688	./mysql_lab_eng002/lab_files.ibd
+NAME	SPACE_TYPE	FILE_SIZE
+mysql	General	27262976
+--- datadir 中 lab 库目录 ---
+total 120
+drwxr-x--- 2 mysql mysql   4096 Sep  1 10:47 .
+drwxr-x--- 9 mysql mysql   4096 Sep  1 10:47 ..
+-rw-r----- 1 mysql mysql 114688 Sep  1 10:47 lab_files.ibd
+lab_files.ibd 初始大小: 114688 bytes
+
+===== 2. 插入 2 万行后：.ibd 增长 =====
+rows_cnt
+20000
+FILE_SIZE	ALLOCATED_SIZE
+13631488	13635584
+lab_files.ibd 插入后大小: 13631488 bytes
+
+===== 3. DELETE 一半行：.ibd 不缩小 =====
+rows_left
+10000
+DELETE 后 lab_files.ibd: 13631488 bytes
+FILE_SIZE
+13631488
+
+===== 4. OPTIMIZE TABLE：重建表，回收碎片 =====
+Table	Op	Msg_type	Msg_text
+mysql_lab_eng002.lab_files	optimize	note	Table does not support optimize, doing recreate + analyze instead
+mysql_lab_eng002.lab_files	optimize	status	OK
+OPTIMIZE 后 lab_files.ibd: 9437184 bytes
+FILE_SIZE
+9437184
+
+===== 5. TRUNCATE：直接重建文件，.ibd 归零 =====
+TRUNCATE 前 lab_files.ibd: 15728640 bytes
+TRUNCATE 后 lab_files.ibd: 114688 bytes
+rows_cnt
+0
+
+===== 6. 清理 lab 对象 =====
+DONE

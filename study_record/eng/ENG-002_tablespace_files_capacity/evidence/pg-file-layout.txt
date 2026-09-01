@@ -1,0 +1,45 @@
+
+===== 0. 建实验库/表（lab_*，实验后清理） =====
+NOTICE:  database "lab_eng002" does not exist, skipping
+
+===== 1. 定位表文件：base/<dboid>/<relfilenode> =====
+     relname      | relkind | relfilenode |    size    
+------------------+---------+-------------+------------
+ lab_files_id_seq | S       |       93292 | 8192 bytes
+ lab_files        | r       |       93293 | 0 bytes
+ lab_files_pkey   | i       |       93301 | 8192 bytes
+(3 rows)
+
+--- 该数据库目录中与本表相关的文件（其余为系统 catalog）---
+lab_files heap relpath=base/93291/93293 建表后大小=0 bytes
+
+===== 2. 插入 2 万行后：文件增长 =====
+插入后 heap 大小=2826240 bytes
+  heap   |  total  
+---------+---------
+ 2760 kB | 3248 kB
+(1 row)
+
+
+===== 3. DELETE 一半行（id 偶数列）：文件不缩小 =====
+ rows_left 
+-----------
+     10000
+(1 row)
+
+DELETE 后 heap 大小=2826240 bytes
+
+===== 4. 普通 VACUUM：清死元组但文件大小不变（死元组与活元组交错） =====
+VACUUM 后 heap 大小=2826240 bytes relpath=base/93291/93293
+
+===== 5. VACUUM FULL：重写表，relfilenode 变化，文件收缩 =====
+VACUUM FULL 前 relpath=base/93291/93293 大小=2826240
+VACUUM FULL 后 relpath=base/93291/93303 大小=1417216
+旧 relfilenode 文件: 已删除
+
+===== 6. TRUNCATE：换新 relfilenode，文件直接归零 =====
+TRUNCATE 前 relpath=base/93291/93303 大小=4243456
+TRUNCATE 后 relpath=base/93291/93309 大小=0（旧文件已删除）
+
+===== 7. 清理实验对象 =====
+DONE
