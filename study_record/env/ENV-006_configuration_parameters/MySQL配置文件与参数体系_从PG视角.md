@@ -1,6 +1,7 @@
 # MySQL 配置文件与参数体系：从 postgresql.conf 与 ALTER SYSTEM 迁移
 
-> 版本：v1.1（2026-09-01：理解验证自测 + 修正"P_S=OFF 时 variables_info 不可用"的旧结论——实测 setup 表仍可查）
+> 版本：v1.1（2026-09-01：理解验证自测 + 修正"P_S=OFF 时 variables_info 不可用"的旧结论——实测 setup 表仍可查；
+> 同日第 6 节实验改为"完整命令 → 真实输出"手册格式，便于新手逐步复现）
 > v1.0（2026-08-28，实机验证于 1C/2G 学习机；含一次受控重启验证）
 > 基线：PostgreSQL 18.4（端口 54184）→ 目标：MySQL 8.4.10 LTS（端口 3306）
 > 系列：PG DBA → MySQL 生产 DBA 迁移项目 · 第一阶段专题 2（ENV-006）
@@ -134,79 +135,147 @@ my_print_defaults mysqld（配置链合成后的有效参数）：
 
 ---
 
-## 6. 实验步骤与实际输出
+## 6. 实验步骤与实际输出（命令 → 真实输出，可复制执行）
+
+> 入口：`mysql -uroot -S /tmp/mysql.sock`；PG 侧 `psql -p 54184`。实验参数已全部还原。
 
 ### 实验 A：读参数三式
 
 ```sql
-SELECT @@GLOBAL.max_connections, @@SESSION.transaction_isolation, @@max_connections;
+SELECT @@GLOBAL.max_connections AS g_max,
+       @@SESSION.transaction_isolation AS s_tx_iso,
+       @@max_connections AS cur_max;
+SELECT @@GLOBAL.innodb_buffer_pool_size/1024/1024 AS bp_mb, @@GLOBAL.log_bin AS log_bin;
 SHOW GLOBAL VARIABLES LIKE 'max_connections';
 SHOW VARIABLES LIKE 'transaction_isolation';
 ```
 
-实际输出：
+真实输出：
 
 ```text
-g_max=100  s_tx_iso=REPEATABLE-READ  cur_max=100  bp_mb=64  log_bin=1
-max_connections  100
-transaction_isolation  REPEATABLE-READ
+g_max	s_tx_iso	cur_max	bp_mb	log_bin
+100	REPEATABLE-READ	100	64.00000000	1
+
+Variable_name	Value
+max_connections	100
+
+Variable_name	Value
+transaction_isolation	REPEATABLE-READ
 ```
 
-解释：`@@x` 默认取 SESSION 值；`SHOW VARIABLES` 也是 SESSION 视角。查全局必须 `GLOBAL` 或 `@@GLOBAL.`。
+解释：`@@x` 默认取 SESSION 视角；`SHOW VARIABLES` 也是 SESSION 视角。查全局必须 `GLOBAL` 或 `@@GLOBAL.`。
 
 ### 实验 B：SESSION 级修改（只影响本会话）
 
 ```sql
 SET SESSION transaction_isolation='READ-COMMITTED';
-SELECT @@SESSION.transaction_isolation, @@GLOBAL.transaction_isolation;
--- READ-COMMITTED | REPEATABLE-READ
--- 新会话：REPEATABLE-READ（不变）
-
-SET SESSION sort_buffer_size=524288;      -- 默认 262144
-SELECT @@GLOBAL.sort_buffer_size, @@SESSION.sort_buffer_size;  -- 262144 | 524288
--- 新会话：262144
+SELECT @@SESSION.transaction_isolation AS sess_iso, @@GLOBAL.transaction_isolation AS glob_iso;
 ```
 
-解释：SESSION 修改是本连接级、立即失效于断开、不写盘；PG 对应 `SET work_mem`。
+真实输出：
 
-### 实验 C：动态 GLOBAL（在线生效）
+```text
+sess_iso	glob_iso
+READ-COMMITTED	REPEATABLE-READ
+```
+
+另开一个连接验证"新会话不受影响"：
+
+```sql
+SELECT @@SESSION.transaction_isolation AS new_sess_iso;   -- 新连接执行
+```
+
+真实输出：
+
+```text
+new_sess_iso
+REPEATABLE-READ
+```
+
+`sort_buffer_size` 同款（默认 262144 → 本会话 524288，新会话回默认）：
+
+```sql
+SET SESSION sort_buffer_size=524288;
+SELECT @@GLOBAL.sort_buffer_size AS g, @@SESSION.sort_buffer_size AS s;
+```
+
+真实输出：
+
+```text
+g	s
+262144	524288
+```
+
+解释：SESSION 修改是本连接级、断开即失效、不写盘；PG 对应 `SET work_mem`。
+
+### 实验 C：动态 GLOBAL（在线生效，新连接可见）
 
 ```sql
 SET GLOBAL max_connections=200;
-SELECT @@GLOBAL.max_connections;            -- 200（本会话也能读到）
--- 新连接：200（已生效）
-SET GLOBAL max_connections=100;             -- 还原
+SELECT @@GLOBAL.max_connections AS after_set;
 ```
 
-实测附加发现：**`server_id` 在 8.0+ 是动态参数**（`SET GLOBAL server_id=2` 成功，无报错）——5.7 时代它是静态的，旧文档不可照抄。
+真实输出：
+
+```text
+after_set
+200
+```
+
+新连接验证（另开连接）：
+
+```sql
+SELECT @@GLOBAL.max_connections AS seen_from_new_conn;
+```
+
+真实输出：
+
+```text
+seen_from_new_conn
+200
+```
+
+还原：`SET GLOBAL max_connections=100;`
+
+实测附加发现：**`server_id` 在 8.0+ 是动态参数**（`SET GLOBAL server_id=2` 成功无报错，`SELECT @@GLOBAL.server_id` → 2，随后还原 1）——5.7 时代它是静态的，旧文档不可照抄。
 
 ### 实验 D：静态参数（必须重启）
 
 ```sql
 SET GLOBAL port=3307;
--- ERROR 1238 (HY000): Variable 'port' is a read only variable
 SET GLOBAL performance_schema=ON;
--- ERROR 1238 (HY000): Variable 'performance_schema' is a read only variable
 ```
 
-解释：`ERROR 1238` = 该参数只能在配置/启动时设置，运行时改不了；要改就改配置文件/启动参数 + 重启。
-这等价于 PG 的 context=postmaster（但 PG 至少有 pending_restart 提示，MySQL 只能靠报错或查文档）。
+真实输出（两条都报 1238）：
+
+```text
+ERROR 1238 (HY000): Variable 'port' is a read only variable
+ERROR 1238 (HY000): Variable 'performance_schema' is a read only variable
+```
+
+解释：`ERROR 1238` = 该参数只能在配置/启动时设置，运行时改不了；要改就改配置文件/启动参数 + 重启。等价于 PG 的 context=postmaster（但 PG 有 pending_restart 提示，MySQL 只能靠报错判断）。
 
 ### 实验 E：SET PERSIST（写盘 + 立即生效 + 重启保留）
 
 ```sql
 SET PERSIST max_connections=105;
-SELECT @@GLOBAL.max_connections;   -- 105（立即生效）
+SELECT @@GLOBAL.max_connections AS persist_105;
 ```
 
-mysqld-auto.cnf 内容（8.0+ 是 JSON）：
+真实输出：
+
+```text
+persist_105
+105
+```
+
+`mysqld-auto.cnf` 内容（datadir 下，8.0+ 为 JSON）：
 
 ```json
-{"Version": 2, "mysql_dynamic_parse_early_variables": {
-  "max_connections": {"Value": "105", "Metadata": {"Host": "localhost", "User": "root", "Timestamp": ...}}}}
+{"Version": 2, "mysql_dynamic_parse_early_variables": {"max_connections": {"Value": "105", "Metadata": {"Host": "localhost", "User": "root", "Timestamp": 1787887954371274}}}}
 ```
 
-**受控重启验证**（mysqladmin shutdown → mysqld_safe 拉起）：
+**受控重启验证**（`mysqladmin shutdown` → `mysqld_safe` 拉起）：
 
 ```text
 重启后: SELECT @@GLOBAL.max_connections → 105   ← my.cnf 里是 100，PERSIST 覆盖生效
@@ -215,25 +284,77 @@ mysqld-auto.cnf 内容（8.0+ 是 JSON）：
 
 结论：`mysqld-auto.cnf` 优先级高于 `my.cnf`，PERSIST 参数重启保留。
 
-### 实验 F：SET PERSIST_ONLY（只写文件，不生效）
+### 实验 F：SET PERSIST_ONLY（只写文件，不改变运行值）
 
 ```sql
-SET PERSIST_ONLY innodb_buffer_pool_size=134217728;   -- 128M
-SELECT @@GLOBAL.innodb_buffer_pool_size/1024/1024;    -- 64（运行值未变）
-RESET PERSIST IF EXISTS innodb_buffer_pool_size;      -- 从 auto.cnf 删除
+SET PERSIST_ONLY innodb_buffer_pool_size=134217728;      -- 128M
+SELECT @@GLOBAL.innodb_buffer_pool_size/1024/1024 AS bp_mb_now;
+RESET PERSIST IF EXISTS innodb_buffer_pool_size;
 ```
 
-解释：PERSIST_ONLY 是给"需重启参数"做预配置用的（写盘等下次重启生效），等价于 PG 的 ALTER SYSTEM 改 postmaster 参数但还没重启。
+真实输出：
+
+```text
+bp_mb_now
+64.00000000
+```
+
+解释：运行值仍是 64M（未生效），文件已写入 128M——给"需重启参数"做预配置用，下次重启生效；等价于 PG 的 ALTER SYSTEM 改了 postmaster 参数但还没重启。
 
 ### 实验 G：PG 对照实验（同思路）
 
-```text
-PG: ALTER SYSTEM SET log_min_duration_statement='1000' + pg_reload_conf()
-    → setting=1000，pending_restart=f（superuser 参数，无需重启）
-PG: ALTER SYSTEM SET max_connections='250' + pg_reload_conf()
-    → setting=100，pending_restart=t（postmaster 参数，待重启）
-PG: SET work_mem='16MB' → 本会话 16MB，新会话 4MB（对应 MySQL SET SESSION）
+superuser 参数（无需重启，reload 即生效）：
+
+```sql
+ALTER SYSTEM SET log_min_duration_statement = '1000';
+SELECT pg_reload_conf();
+SELECT name, setting, pending_restart, source FROM pg_settings WHERE name='log_min_duration_statement';
 ```
+
+真实输出：
+
+```text
+ pg_reload_conf
+----------------
+ t
+
+            name                     | setting | pending_restart |       source
+-------------------------------------+---------+-----------------+--------------------
+ log_min_duration_statement          | 1000    | f               | configuration file
+```
+
+postmaster 参数（必须重启，pending_restart=t）：
+
+```sql
+ALTER SYSTEM SET max_connections = '250';
+SELECT pg_reload_conf();
+SELECT name, setting, pending_restart FROM pg_settings WHERE name='max_connections';
+```
+
+真实输出：
+
+```text
+      name       | setting | pending_restart
+-----------------+---------+-----------------
+ max_connections | 100     | t
+```
+
+会话级 SET（对应 MySQL SET SESSION）：
+
+```sql
+SET work_mem='16MB';
+SHOW work_mem;
+```
+
+真实输出：
+
+```text
+ work_mem
+----------
+ 16MB
+```
+
+（另开会话：`SHOW work_mem` → `4MB`）
 
 ---
 

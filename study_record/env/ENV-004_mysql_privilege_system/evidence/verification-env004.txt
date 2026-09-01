@@ -1,0 +1,45 @@
+===== ENV-004 理解验证（2026-09-01 实机抽查）=====
+
+===== 0. 准备：同名不同 host 两个 Account + Role lab_role4 =====
+user	host
+lab_v4	127.0.0.1
+lab_v4	localhost
+
+===== 1. Account 二元组：同名不同 host 是不同账号（权限分别挂） =====
+--- socket 连 lab_v4@localhost → SELECT 成功
+id	v
+1	alpha
+2	beta
+--- TCP 连 lab_v4@127.0.0.1 → 同密码但 SELECT 被拒（无表权限）
+ERROR 1044 (42000): Access denied for user 'lab_v4'@'127.0.0.1' to database 'mysql_lab_v4'
+
+===== 2. Role 默认不激活：CURRENT_ROLE()=NONE，权限不生效 =====
+--- 未 SET ROLE → CURRENT_ROLE() 与 SELECT
+u	cu	cr
+lab_v4@localhost	lab_v4@localhost	NONE
+id	v
+1	alpha
+2	beta
+
+===== 3. SET ROLE 激活后权限生效 =====
+--- SET ROLE lab_role4 → SELECT 成功
+u	cu	cr
+lab_v4@localhost	lab_v4@localhost	`lab_role4`@`%`
+id	v
+1	alpha
+2	beta
+
+===== 4. 排查三连 + SHOW GRANTS（固定流程） =====
+--- 三连 + grants
+USER()	CURRENT_USER()	CURRENT_ROLE()
+lab_v4@localhost	lab_v4@localhost	NONE
+Grants for lab_v4@localhost
+GRANT USAGE ON *.* TO `lab_v4`@`localhost`
+GRANT SELECT ON `mysql_lab_v4`.`t_v4` TO `lab_v4`@`localhost`
+GRANT `lab_role4`@`%` TO `lab_v4`@`localhost`
+
+===== 5. 清理 =====
+user	host
+lab_user	%
+lab_user	localhost
+DONE

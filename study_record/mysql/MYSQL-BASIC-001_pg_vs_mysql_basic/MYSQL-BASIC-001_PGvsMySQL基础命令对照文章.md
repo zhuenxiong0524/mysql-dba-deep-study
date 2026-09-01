@@ -944,14 +944,29 @@ RESET PERSIST max_connections;            # 文件缩为 14 字节（空 JSON {}
 ```sql
 -- PG：没有 autocommit 参数（实机报错）
 SHOW autocommit;
+```
+
+真实输出：
+
+```text
 ERROR:  unrecognized configuration parameter "autocommit"
 ```
 
 PG 的 autocommit 是隐式约定（每个语句自动提交，除非显式 BEGIN）；MySQL 有真实参数 `@@autocommit=1`（默认开）：
 
 ```sql
-SELECT @@autocommit;     -- 1
-SET autocommit=0;        -- 会话级关闭
+SELECT @@autocommit;
+SET autocommit=0;
+SELECT @@autocommit;
+```
+
+真实输出：
+
+```text
+@@autocommit
+1
+@@autocommit
+0
 ```
 
 ### 12.2 BEGIN / COMMIT / ROLLBACK（DML）
@@ -962,27 +977,66 @@ BEGIN; INSERT INTO t_user(name,age) VALUES ('rollback_test',99); ROLLBACK;
 BEGIN; INSERT INTO t_user(name,age) VALUES ('commit_test',99); COMMIT;
 ```
 
-实机：两边回滚后 `rollback_test` 行数都是 0，提交后 `commit_test` 都在。**DML 事务语义一致**（InnoDB 与 PG 堆表都支持 MVCC 回滚）。
+PG 侧真实输出（回滚后行数 0、提交后能查到）：
+
+```text
+BEGIN
+INSERT 0 1
+ROLLBACK
+0
+BEGIN
+INSERT 0 1
+COMMIT
+commit_test
+```
+
+MySQL 侧真实输出（同样回滚后 0 行、提交后能查到）：
+
+```text
+cnt
+0
+name
+commit_test
+```
+
+实机结论：**DML 事务语义一致**（InnoDB 与 PG 堆表都支持 MVCC 回滚）。
 
 ### 12.3 DDL 是否可回滚（实测，重点中的重点）
 
 ```sql
 -- PG：DDL 是事务性的！
 BEGIN; CREATE TABLE t_ddl_test(id int PRIMARY KEY); ROLLBACK;
--- 之后 \dt 无 t_ddl_test；pg_tables 计数=0
+```
+
+真实输出（回滚后 `\dt` 无 t_ddl_test，`pg_tables` 计数 = 0）：
+
+```text
+ROLLBACK
+              List of tables
+ Schema |   Name   | Type  |    Owner
+--------+----------+-------+--------------
+ public | t_serial | table | compare_user
+ public | t_user   | table | compare_user
+(2 rows)
 ```
 
 ```sql
 -- MySQL：DDL 隐式提交，不可回滚！
 START TRANSACTION; CREATE TABLE t_ddl_test(id INT PRIMARY KEY); ROLLBACK;
-SHOW TABLES LIKE 't_ddl_test';   -- 表还在！
--- information_schema.tables 计数=1
+SHOW TABLES LIKE 't_ddl_test';
 ```
 
-TRUNCATE 同样：
+真实输出（回滚后表还在，计数 = 1）：
 
 ```text
-PG:    BEGIN; TRUNCATE t_trunc; ROLLBACK; → 行数 1（回滚成功）
+Tables_in_db_compare (t_ddl_test)
+t_ddl_test
+```
+
+TRUNCATE 同样（两边真实输出）：
+
+```text
+PG:    BEGIN; TRUNCATE t_trunc; ROLLBACK;   → 行数 1（回滚成功）
 MySQL: START TRANSACTION; TRUNCATE t_trunc; ROLLBACK; → 行数 0（TRUNCATE 隐式提交）
 ```
 

@@ -1,0 +1,58 @@
+===== ENV-005 理解验证（2026-09-01 实机）=====
+
+===== 1. 单进程多线程模型：mysqld 进程数 vs 连接线程 =====
+mysql       6204       1  0 09:51 ?        00:00:00 /bin/sh /usr/local/mysql/mysql-8.4.10/bin/mysqld_safe --user=mysql
+mysql       6420    6204  0 09:51 ?        00:00:05 /usr/local/mysql/mysql-8.4.10/bin/mysqld --basedir=/usr/local/mysql/mysql-8.4.10 --datadir=/data/myhome/mydata/mysql --plugin-dir=/usr/local/mysql/mysql-8.4.10/lib/plugin --log-error=/data/myhome/mydata/mysql/error.log --pid-file=/data/myhome/mydata/mysql/mysql.pid --socket=/tmp/mysql.sock --port=3306
+
+===== 2. 实例身份变量 =====
+hn	@@port	@@socket	@@datadir	@@pid_file	@@log_error
+node01	3306	/tmp/mysql.sock	/data/myhome/mydata/mysql/	/data/myhome/mydata/mysql/mysql.pid	/data/myhome/mydata/mysql/error.log
+
+===== 3. server_uuid（auto.cnf） =====
+server-uuid=1709cb6a-a133-11f1-b0cd-000c29951355
+
+===== 4. datadir 构成关键文件 =====
+auto.cnf
+binlog.000001
+binlog.000002
+binlog.000003
+binlog.000004
+binlog.000005
+binlog.000006
+binlog.000007
+binlog.000008
+binlog.000009
+binlog.000010
+binlog.000011
+binlog.000012
+binlog.000013
+binlog.000014
+binlog.000015
+binlog.index
+error.log
+ibdata1
+#innodb_redo
+mysqld-auto.cnf
+mysql.pid
+undo_001
+undo_002
+
+===== 5. 连接与线程计数 =====
+Variable_name	Value
+Threads_connected	1
+Variable_name	Value
+Threads_running	2
+processlist_rows
+2
+
+===== 6. 探活（排障第一步） =====
+mysqld is alive
+
+===== 7. P_S=OFF 现状复核（setup 表可用 / instrumentation 不可用） =====
+p_s
+0
+variables_info_rows
+647
+events_rows
+0
+DONE

@@ -60,6 +60,26 @@ SELECT * FROM mysql.tables_priv WHERE User='目标';
 SELECT * FROM mysql.columns_priv WHERE User='目标';
 ```
 
+本机实测（lab_case002 无授权、lab_case003 仅列授权，root 执行）：
+
+```text
+-- mysql.user：账号与认证插件
+user	host	plugin
+lab_case002	localhost	caching_sha2_password
+lab_case003	localhost	caching_sha2_password
+
+-- mysql.db（库级授权）：空 = 两个账号都没有库级授权
+-- mysql.tables_priv（表级授权）：lab_case003 在 t_emp 有记录（Table_priv 空 = 仅列授权）
+Host	Db	User	Table_name	Table_priv
+localhost	mysql_lab_case	lab_case003	t_emp
+
+-- mysql.columns_priv（列级授权）：name 列 Select
+Host	Db	User	Table_name	Column_name	Column_priv
+localhost	mysql_lab_case	lab_case003	t_emp	name	Select
+```
+
+判断：错误码 1143 → 查 `mysql.columns_priv` 找缺的列；1142 → 查 `mysql.tables_priv`；1044 → 查 `mysql.db`。空结果 = 该层没授权，就是根因。
+
 ## 根因
 
 1. 1044：对目标库无任何权限（连接库、建库、库内操作都会触发）

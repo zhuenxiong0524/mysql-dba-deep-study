@@ -550,13 +550,42 @@ SELECT user, host, LENGTH(authentication_string) FROM mysql.user WHERE user='emp
 -- 三行 auth_str_len 均为 0（空密码）
 ```
 
-**实际输出**：
+**实际输出（三条连接命令逐个执行）**：
+
+```bash
+# 1) socket 连接
+mysql -uempty_test -S /tmp/mysql.sock -e "SELECT USER(), CURRENT_USER();"
+```
 ```text
-1) socket              → empty_test@localhost        CURRENT_USER=empty_test@localhost    ✅
-2) TCP 127.0.0.1       → empty_test@127.0.0.1        CURRENT_USER=empty_test@127.0.0.1    ✅
-3) TCP 192.168.101.129 → empty_test@192.168.101.129  CURRENT_USER=empty_test@%            ✅
-对照: root 只有 @localhost 一个 Account
-      mysql -uroot -h 127.0.0.1 → ERROR 1045 (28000): Access denied for user 'root'@'127.0.0.1' (using password: NO)
+USER()	CURRENT_USER()
+empty_test@localhost	empty_test@localhost
+```
+
+```bash
+# 2) TCP 127.0.0.1
+mysql -uempty_test -h127.0.0.1 -P3306 -e "SELECT USER(), CURRENT_USER();"
+```
+```text
+USER()	CURRENT_USER()
+empty_test@127.0.0.1	empty_test@127.0.0.1
+```
+
+```bash
+# 3) TCP 本机 IP（192.168.101.129），命中 % 兜底账号
+mysql -uempty_test -h192.168.101.129 -P3306 -e "SELECT USER(), CURRENT_USER();"
+```
+```text
+USER()	CURRENT_USER()
+empty_test@192.168.101.129	empty_test@%
+```
+
+对照：root 只有 `@localhost` 一个 Account：
+
+```bash
+mysql -uroot -h 127.0.0.1 -P3306 -e "SELECT 1;"
+```
+```text
+ERROR 1045 (28000): Access denied for user 'root'@'127.0.0.1' (using password: NO)
 ```
 
 **结论**：

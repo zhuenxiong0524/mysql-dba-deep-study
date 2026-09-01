@@ -42,6 +42,17 @@ SELECT user, host, plugin FROM mysql.user WHERE user LIKE '目标%';
 SHOW GRANTS FOR 'user'@'host';
 ```
 
+本机实测（账号 lab_case001/002/003 建好后执行 `SELECT user, host, plugin FROM mysql.user WHERE user LIKE 'lab_case%';`）：
+
+```text
+user	host	plugin
+lab_case001	localhost	caching_sha2_password
+lab_case002	localhost	caching_sha2_password
+lab_case003	localhost	caching_sha2_password
+```
+
+判断：`mysql.user` 里没有该 `user@host` → 账号不存在或 host 不匹配；有 → 继续查密码/plugin。
+
 本机实测（socket 正确密码 + 匹配 host）：
 
 ```text

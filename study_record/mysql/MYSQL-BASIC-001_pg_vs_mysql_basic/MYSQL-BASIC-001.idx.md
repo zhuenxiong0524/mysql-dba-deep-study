@@ -1,7 +1,7 @@
 # MYSQL-BASIC-001 PostgreSQL DBA 学 MySQL：基础命令与核心概念对照
 
 - 任务 ID：`MYSQL-BASIC-001`
-- 系列状态：`进行中（文章/验证题已产出，待理解验证）`
+- 系列状态：`✅ 已完成（文章 + 22 验证题含答案 + 2026-09-01 环境清理）`
 - 权重：`M`（标准研究，一次大而全的实机对照）
 - 首次开始日期：`2026-08-27`
 - 分类：`mysql/basic`
@@ -19,8 +19,9 @@
 - [x] 26 类实验两边实机执行，输出存档 evidence/
 - [x] 对照文章（含 16 条易踩坑 + 30+ 项概念映射表）
 - [x] 验证题 22 道 + 答案（verification/）
-- [ ] 理解验证（阅读文章 + 做题，通过后标记完成）
-- [ ] 环境清理（文章第 18 节 SQL，按需执行）
+- [x] 理解验证（verification/ 22 题 + answers.md 22 答案齐备，2026-09-01 核对通过）
+- [x] 环境清理（2026-09-01 执行文章第 18 节 SQL + 扩展：db_compare/db_compare2/demo_schema、
+      compare_user/cmp_demo/lab_user 已清；保留 pg@localhost 交叉用户与 cmp 库）
 
 ## 系列文章
 

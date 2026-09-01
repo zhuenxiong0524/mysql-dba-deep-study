@@ -20,8 +20,8 @@
 ## ENV 环境
 
 ### ENV-001 MySQL 8.4.10 源码编译安装（S，P0）
-- 进行中：源码下载校验、cmake 配置、编译安装（见 docs/environment.md）
-- 待完成：实例初始化、启动、验证 3306
+- ✅ 已完成（2026-08-26）：源码下载校验、cmake 配置、编译安装、初始化、启动验证 3306、双引擎互通
+- 详见 `study_record/env/ENV-001_mysql84_source_build/`
 
 ### ENV-002 双引擎交叉访问与对照实验工具链（S，P0）
 - PG 侧：mysql 用户 trust 免密；MySQL 侧：建 pg@localhost
@@ -193,11 +193,11 @@
 
 ## MYSQL-BASIC 基础命令对照（新增系列，v0.4 2026-08-27）
 
-### MYSQL-BASIC-001 基础命令与核心概念对照（M，P0，已完成文章）
+### MYSQL-BASIC-001 基础命令与核心概念对照（M，P0，✅ 已完成 2026-09-01）
 - PG 基线：psql 元命令、pg_stat_activity、pg_settings、role、事务/DDL 语义
 - MySQL：mysql 客户端、SHOW 系列、PROCESSLIST、SHOW VARIABLES、user@host、autocommit/DDL 隐式提交
 - 实验：26 类"同命令两边跑"，输出见 study_record/mysql/MYSQL-BASIC-001_pg_vs_mysql_basic/evidence/
-- 交付：对照文章（16 条易踩坑 + 30+ 概念映射表）+ 22 道验证题
+- 交付：对照文章（16 条易踩坑 + 30+ 概念映射表）+ 22 道验证题（含答案）；2026-09-01 环境清理完毕
 
 
 ---
@@ -211,7 +211,7 @@
 ### 第一阶段：敢登录、敢看、不会误操作（P0）
 | 顺序 | 专题 | 任务 ID | 状态 |
 |---|---|---|---|
-| 1 | 实例架构与生命周期 | ENV-005 | 进行中 2026-08-28 |
+| 1 | 实例架构与生命周期 | ENV-005 | ✅ 已完成 2026-09-01 |
 | 2 | 配置文件与参数体系 | ENV-006 | ✅ 已完成 2026-09-01 |
 | 3 | 登录与认证 | ENV-007 | ✅ 已完成 2026-09-01 |
 | 4 | 账号与权限体系 | ENV-004 | ✅ 已完成 |

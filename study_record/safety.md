@@ -16,7 +16,9 @@
 
 - 不伪造/不脑补实验结果：命令失败后不许"假设预期结果"，必须保留真实输出
 - 不修改 `root` / `postgres` 等重要账号做破坏性实验（如 DROP/ALTER root）
-- 不动现有业务库：`cmp` / `db_compare` / `db_compare2` / `demo_schema` 等
+- 不动现有业务库：`cmp`（ENV-001 交叉访问库）等
+- 历史实验库 `db_compare` / `db_compare2` / `demo_schema`（MYSQL-BASIC-001 实验对象）已于 2026-09-01 清理；
+  新实验一律用 `mysql_lab_*`，不重复占用旧名
 - 不在非专用实例上执行 `kill -9` / crash 模拟（当前 3306 是学习主实例，crash 演练留给 REDO-001 专用实例）
 - 不把 PG 机制"改个名字"当 MySQL 讲（WAL≠Binlog、VACUUM≠Purge、shared_buffers≠Buffer Pool、Role≠User）
 
