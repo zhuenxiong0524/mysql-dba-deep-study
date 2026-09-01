@@ -6,7 +6,8 @@
 
 | PostgreSQL | MySQL | 是否等价 | 一句话差异 | 出处 |
 |---|---|---|---|---|
-| postgres（postmaster+backend 进程） | mysqld（单进程多线程） | 🔶 | PG 一连接一进程；MySQL 一连接一线程 + InnoDB 后台线程族 | ENV-005 |
+| postgres（postmaster+backend 进程） | mysqld（单进程多线程） | 🔶 | PG 一连接一进程；MySQL 一连接一线程 + InnoDB 后台线程族 | ENV-005/ENG-001 |
+| postmaster 辅助进程（checkpointer/bgwriter/walwriter/autovacuum launcher） | InnoDB 后台线程族（purge/page_cleaner/log_writer/log_flusher/log_checkpointer/io_read/io_write） | 🔶 | 职责一一对应（purge≈vacuum、page_cleaner≈bgwriter、log_*≈walwriter），但形态是进程 vs 线程；MySQL 无进程隔离 | ENG-001 |
 | postgresql.conf | my.cnf + 启动参数 | 🔶 | PG 单文件集中；MySQL 有配置搜索路径 + SET PERSIST(mysqld-auto.cnf) | ENV-006 |
 | pg_settings（SHOW） | SHOW [GLOBAL\|SESSION] VARIABLES / @@var + performance_schema.variables_info | 🔶 | PG 有 context+source+pending_restart；MySQL 无来源列但 variables_info（P_S=OFF 也可查）给 VARIABLE_SOURCE/PATH/SET_USER，无全局 reload | ENV-006 |
 | pg_ctl start/stop/reload | mysqld_safe / mysqladmin shutdown / systemd | 🔶 | 本环境无 systemd 单元，mysqld_safe 托管 | ENV-005 |

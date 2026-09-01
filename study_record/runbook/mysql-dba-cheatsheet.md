@@ -52,6 +52,19 @@ SHOW GLOBAL STATUS LIKE 'Threads%';  -- Threads_connected / Threads_running
 SHOW VARIABLES LIKE 'max_connections';
 ```
 
+线程数观察（ENG-001：mysqld 单进程多线程，进程恒 1 个）：
+
+```bash
+ps -ef | grep "[m]ysqld"                          # 进程恒 1 个（+守护 mysqld_safe），≠ 负载
+ls /proc/$(cat /data/myhome/mydata/mysql/mysql.pid)/task | wc -l   # 全部线程数
+ps -L -p $(cat /data/myhome/mydata/mysql/mysql.pid) -o tid,comm | head
+```
+
+```sql
+SHOW ENGINE INNODB STATUS\G  -- BACKGROUND THREAD / FILE I/O 段：后台线程族（purge/page_cleaner/log_*/io_*）
+-- P_S=OFF 时 performance_schema.threads 为空，用 processlist + SHOW ENGINE INNODB STATUS 兜底
+```
+
 ## 当前用户是谁 / 有什么权限？
 
 ```sql

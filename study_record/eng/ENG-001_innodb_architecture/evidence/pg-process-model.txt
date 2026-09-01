@@ -1,0 +1,55 @@
+
+===== 1. PG 进程树（全部 postgres 进程，含辅助与 backend） =====
+615 1 /usr/local/bin/redis-server
+686 1 /usr/bin/python3
+687 1 /usr/local/bin/pgbouncer
+8436 1 /usr/local/pgsql/pgsql18.4/bin/postgres
+8437 8436 postgres:
+8438 8436 postgres:
+8439 8436 postgres:
+8440 8436 postgres:
+8441 8436 postgres:
+8442 8436 postgres:
+8444 8436 postgres:
+8445 8436 postgres:
+8446 8436 postgres:
+12097 12086 su
+12104 12097 -bash
+postgres 进程总数: 16
+
+===== 2. 开 2 个 psql 睡眠连接后观察 =====
+postgres 进程总数（+2 backend）: 20
+615 /usr/local/bin/redis-server
+686 /usr/bin/python3
+687 /usr/local/bin/pgbouncer
+8436 /usr/local/pgsql/pgsql18.4/bin/postgres
+8438 postgres:
+8439 postgres:
+8440 postgres:
+12097 su
+12104 -bash
+12290 /usr/local/pgsql/pgsql18.4/bin/psql
+12292 postgres:
+12293 /usr/local/pgsql/pgsql18.4/bin/psql
+12295 postgres:
+12292|psql|active
+12295|psql|active
+12311|psql|active
+
+===== 3. 等待回落 =====
+回落: postgres 进程总数=16
+DONE
+
+===== 补充：干净的 PG 进程树（ps -C postgres）=====
+    PID    PPID COMMAND
+   8436       1 /usr/local/pgsql/pgsql18.4/bin/postgres -D /data/pgdata/pgdata18.4
+   8437    8436 postgres: logger
+   8438    8436 postgres: io worker 2
+   8439    8436 postgres: io worker 1
+   8440    8436 postgres: io worker 0
+   8441    8436 postgres: checkpointer
+   8442    8436 postgres: background writer
+   8444    8436 postgres: walwriter
+   8445    8436 postgres: autovacuum launcher
+   8446    8436 postgres: logical replication launcher
+postgres 进程总数: 10（空闲时无 backend；每开 1 个连接 +1 个 backend 进程）
