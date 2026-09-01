@@ -11,7 +11,9 @@
 | pg_settings（SHOW） | SHOW [GLOBAL\|SESSION] VARIABLES / @@var + performance_schema.variables_info | 🔶 | PG 有 context+source+pending_restart；MySQL 无来源列但 variables_info（P_S=OFF 也可查）给 VARIABLE_SOURCE/PATH/SET_USER，无全局 reload | ENV-006 |
 | pg_ctl start/stop/reload | mysqld_safe / mysqladmin shutdown / systemd | 🔶 | 本环境无 systemd 单元，mysqld_safe 托管 | ENV-005 |
 | Role | Account = 'user'@'host' | ❌ | host 是身份一部分，同名不同 host 是不同账号 | ENV-004 |
-| pg_hba.conf | mysql.user host 匹配 + authentication_policy | ❌ | PG 连接来源与认证独立于角色；MySQL 内建于账号 | ENV-004 |
+| pg_hba.conf | mysql.user host 匹配 + authentication_policy | ❌ | PG 来源由 hba 行决定（trust/md5/scram）；MySQL host 焊死在账号里，无匹配 Account 即 1045 | ENV-004/007 |
+| password_encryption / SCRAM | 认证插件（默认 caching_sha2_password） | 🔶 | PG 密码存 SCRAM-SHA-256；MySQL 账号带 plugin 列；caching_sha2 需 TLS 或 RSA（--ssl-mode=DISABLED 报 2061） | ENV-007 |
+| ~/.pgpass | login-path / .my.cnf [client] | 🔶 | login-path 加密（~/.mylogin.cnf）优于明文 .my.cnf | ENV-007 |
 | CREATE ROLE ... LOGIN | CREATE USER / CREATE ROLE | 🔶 | MySQL 的 role 默认不可登录且需激活 | ENV-004 |
 | GRANT/REVOKE + ACL | GRANT/REVOKE + mysql 权限表 | 🔶 | MySQL 集中权限表、无显式 DENY（库级伞下 REVOKE 报 1147） | ENV-004 |
 | WITH GRANT OPTION | WITH GRANT OPTION | ✅ | 均只能转授持有且不超 scope 的权限 | ENV-004 |

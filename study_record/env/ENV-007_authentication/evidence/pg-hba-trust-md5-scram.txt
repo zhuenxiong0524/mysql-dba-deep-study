@@ -1,0 +1,39 @@
+# ENV-007 PG 侧认证对照实验（2026-09-01）
+
+===== 0. 准备 lab_auth 角色 =====
+NOTICE:  role "lab_auth" does not exist, skipping
+DROP ROLE
+CREATE ROLE
+lab_auth|t|SCRAM-SHA-256$4096:w
+scram-sha-256
+
+===== 1. trust 认证（pg_hba: 127.0.0.1 trust）→ 免密成功 =====
+--- psql -h 127.0.0.1 -U lab_auth（无密码）
+ current_user 
+--------------
+ lab_auth
+(1 row)
+
+
+===== 2. md5/scram 认证（pg_hba: 192.168.101.0/24 md5；密码存 scram 时按 scram 交换） =====
+--- 正确密码（PGPASSWORD）
+ current_user 
+--------------
+ lab_auth
+(1 row)
+
+--- 错误密码 → FATAL password authentication failed
+psql: error: connection to server at "192.168.101.129", port 54184 failed: FATAL:  password authentication failed for user "lab_auth"
+--- 缺密码 → FATAL no password supplied
+Password for user lab_auth: 
+psql: error: connection to server at "192.168.101.129", port 54184 failed: fe_sendauth: no password supplied
+
+===== 3. 角色与来源解耦（同一角色，两条 hba 行两种认证） =====
+--- 同一 lab_auth：trust 来源
+trust-ok
+--- 同一 lab_auth：md5 来源
+md5-ok
+
+===== 4. 清理 =====
+DROP ROLE
+DONE

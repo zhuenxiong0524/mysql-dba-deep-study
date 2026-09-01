@@ -60,6 +60,37 @@ SHOW GRANTS;
 SHOW GRANTS FOR CURRENT_USER;
 ```
 
+## 登录与认证速查（ENV-007）
+
+```bash
+# 连接路线决定 host 匹配方向：socket→localhost；TCP→IP 字面量（skip-name-resolve=ON）
+mysql -uroot -S /tmp/mysql.sock                 # socket
+mysql -uuser -h127.0.0.1 -P3306 -p             # TCP 回环
+mysql --login-path=demo                        # 加密凭据（mysql_config_editor set 生成）
+```
+
+```sql
+-- USER()=客户端声称身份；CURRENT_USER()=实际命中的 Account（不一致=命中 % 通配账号）
+SELECT USER(), CURRENT_USER(), CURRENT_ROLE();
+-- 认证插件与账号 host
+SELECT user, host, plugin FROM mysql.user WHERE user LIKE '目标%';
+-- 连接是否 TLS（caching_sha2 免 RSA 的前提；Ssl_cipher 空=socket 或未走 TLS）
+SHOW SESSION STATUS LIKE 'Ssl_cipher';
+```
+
+```text
+ERROR 1045 (28000) ... using password: YES → 密码错/账号不存在/host 不匹配（见 CASE-001）
+ERROR 2061 (HY000) Authentication requires secure connection
+  → caching_sha2 非 TLS 需 RSA：加 --ssl-mode=REQUIRED 或 --get-server-public-key
+```
+
+```bash
+# login-path 管理（~/.mylogin.cnf 加密；print 显示掩码）
+mysql_config_editor set --login-path=demo --host=127.0.0.1 --user=u --password
+mysql_config_editor print --all
+mysql_config_editor remove --login-path=demo
+```
+
 ## 参数从哪里来的？
 
 ```sql

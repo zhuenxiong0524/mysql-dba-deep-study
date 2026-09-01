@@ -1,0 +1,46 @@
+# ENV-007 MySQL caching_sha2 补充实验（2026-09-01）
+
+===== 0. 准备全新账号（确保无认证缓存干扰） =====
+user	host	plugin	empty_pwd
+lab_empty2	%	caching_sha2_password	1
+lab_empty2	127.0.0.1	caching_sha2_password	1
+lab_sha2b	127.0.0.1	caching_sha2_password	0
+
+===== A. caching_sha2_password 首次 TCP 认证（无缓存、非 TLS、无 RSA 参数） =====
+--- 全新账号 TCP 无 RSA（期望失败：需 secure connection）
+1
+1
+--- 带 --get-server-public-key（期望成功）
+ok
+1
+--- 再次无 RSA（期望成功：已缓存 fast auth）
+ok
+1
+
+===== B. 空密码账号 TCP（匹配 host，无 RSA） =====
+--- lab_empty2@127.0.0.1 TCP（期望成功：空密码 fast path）
+u	cu
+lab_empty2@127.0.0.1	lab_empty2@127.0.0.1
+--- lab_empty2@% 经局域网 IP（期望成功）
+u	cu
+lab_empty2@192.168.101.129	lab_empty2@%
+
+===== C. login-path（mysql_config_editor，完整路径） =====
+mysql_config_editor: [ERROR] /usr/local/mysql/mysql-8.4.10/bin/mysql_config_editor: option '--password' cannot take an argument.
+--- print --all（生产注意：会显示口令信息）
+--- mysql --login-path=demo（期望成功）
+ERROR 1045 (28000): Access denied for user 'mysql'@'localhost' (using password: NO)
+--- remove 后 print
+
+===== D. ~/.my.cnf 默认搜索路径 =====
+--- 无参数 mysql（默认读 ~/.my.cnf [client]）
+u	cu
+lab_empty2@127.0.0.1	lab_empty2@127.0.0.1
+--- 删除后确认无 .my.cnf
+ls: cannot access '/home/mysql/.my.cnf': No such file or directory
+
+===== E. 清理 =====
+user	host
+lab_user	%
+lab_user	localhost
+DONE

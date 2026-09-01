@@ -1,0 +1,36 @@
+# ENV-007 MySQL ssl-mode 实验（2026-09-01）
+
+===== 0. 重建 lab_sha2c@127.0.0.1（全新，无缓存） =====
+
+===== A2. TLS 是 caching_sha2 免 RSA 的原因？ =====
+--- ssl-mode=DISABLED + 无 RSA（期望失败：需 secure connection）
+ERROR 2061 (HY000): Authentication plugin 'caching_sha2_password' reported error: Authentication requires secure connection.
+--- ssl-mode=DISABLED + --get-server-public-key（期望成功）
+ok
+1
+--- 默认（PREFERRED）连接并查 SSL 状态（期望 Ssl_cipher 非空）
+Variable_name	Value
+Ssl_cipher	TLS_AES_128_GCM_SHA256
+Variable_name	Value
+Ssl_version	TLSv1.3
+--- socket 连接 SSL 状态（socket 走文件，无 TLS 也无 RSA）
+ERROR 1045 (28000): Access denied for user 'lab_sha2c'@'localhost' (using password: YES)
+
+===== C2. login-path 修正（--password 交互式输入） =====
+Enter password: --- print --all
+[demo]
+user = "lab_sha2c"
+password = *****
+host = "127.0.0.1"
+--- mysql --login-path=demo（期望成功）
+u	cu
+lab_sha2c@127.0.0.1	lab_sha2c@127.0.0.1
+Variable_name	Value
+Ssl_cipher	TLS_AES_128_GCM_SHA256
+--- remove 后 print（应为空）
+
+===== E2. 清理 =====
+user	host
+lab_user	%
+lab_user	localhost
+DONE

@@ -1,0 +1,91 @@
+# ENV-007 MySQL 侧实验输出（2026-09-01 实跑）
+
+===== 0. 准备：lab_auth / lab_host* / lab_sha2 账号（全部 lab_ 前缀） =====
+user	host	plugin
+lab_auth	%	caching_sha2_password
+lab_auth	127.0.0.1	caching_sha2_password
+lab_auth	localhost	caching_sha2_password
+lab_empty	localhost	caching_sha2_password
+lab_host	%	caching_sha2_password
+lab_host	127.0.0.1	caching_sha2_password
+lab_host	192.168.%	caching_sha2_password
+lab_host	192.168.101.129	caching_sha2_password
+lab_host	localhost	caching_sha2_password
+lab_sha2	127.0.0.1	caching_sha2_password
+lab_sha2	localhost	caching_sha2_password
+lab_user	%	caching_sha2_password
+lab_user	localhost	caching_sha2_password
+
+===== 1. 连接路线三式：socket / TCP 127.0.0.1 / TCP 局域网 IP（身份验证 USER()/CURRENT_USER()） =====
+--- socket: lab_auth@localhost
+u	cu	cr
+lab_auth@localhost	lab_auth@localhost	NONE
+--- tcp 127.0.0.1: lab_auth@127.0.0.1
+u	cu
+lab_auth@127.0.0.1	lab_auth@127.0.0.1
+--- tcp 192.168.101.129: lab_auth@% 兜底
+u	cu
+lab_auth@192.168.101.129	lab_auth@%
+
+===== 2. host 匹配顺序：同用户名 5 个 host，看 CURRENT_USER() 命中哪个 =====
+--- socket 来源 → 期望 localhost
+u	cu
+lab_host@localhost	lab_host@localhost
+--- tcp 127.0.0.1 → 期望 127.0.0.1
+u	cu
+lab_host@127.0.0.1	lab_host@127.0.0.1
+--- tcp 192.168.101.129 → 期望具体 IP（精确优先于网段/%）
+u	cu
+lab_host@192.168.101.129	lab_host@192.168.101.129
+
+===== 3. 认证插件矩阵 =====
+--- mysql.user.plugin 全览
+user	host	plugin	empty_pwd
+lab_auth	%	caching_sha2_password	0
+lab_auth	127.0.0.1	caching_sha2_password	0
+lab_auth	localhost	caching_sha2_password	0
+lab_empty	localhost	caching_sha2_password	1
+lab_host	%	caching_sha2_password	0
+lab_host	127.0.0.1	caching_sha2_password	0
+lab_host	192.168.%	caching_sha2_password	0
+lab_host	192.168.101.129	caching_sha2_password	0
+lab_host	localhost	caching_sha2_password	0
+lab_sha2	127.0.0.1	caching_sha2_password	0
+lab_sha2	localhost	caching_sha2_password	0
+lab_user	%	caching_sha2_password	0
+lab_user	localhost	caching_sha2_password	0
+root	localhost	caching_sha2_password	1
+--- caching_sha2_password: socket 有密码（期望成功）
+ok
+1
+--- caching_sha2_password: tcp 127.0.0.1 有密码、无 RSA 参数（期望失败）
+1
+1
+--- caching_sha2_password: tcp + --get-server-public-key（期望成功）
+ok
+1
+--- 空密码账号: tcp 无 RSA 也成功
+ERROR 1045 (28000): Access denied for user 'lab_empty'@'127.0.0.1' (using password: NO)
+--- 密码错误 → 1045
+ERROR 1045 (28000): Access denied for user 'lab_sha2'@'localhost' (using password: YES)
+
+===== 4. 客户端凭据：login-path =====
+/tmp/env007_mysql.sh: line 46: /usr/local/bin/mysql_config_editor: No such file or directory
+--- mysql_config_editor print（生产注意：明文显示）
+/tmp/env007_mysql.sh: line 5: /usr/local/bin/mysql_config_editor: No such file or directory
+--- mysql --login-path=demo
+ERROR 1045 (28000): Access denied for user 'mysql'@'localhost' (using password: NO)
+/tmp/env007_mysql.sh: line 49: /usr/local/bin/mysql_config_editor: No such file or directory
+--- remove 后残留检查
+/tmp/env007_mysql.sh: line 5: /usr/local/bin/mysql_config_editor: No such file or directory
+
+===== 5. 客户端凭据：.my.cnf [client] =====
+--- mysql --defaults-file=/tmp/my_client_cnf_test（免输参数连接）
+u	cu
+lab_auth@localhost	lab_auth@localhost
+
+===== 6. 清理 =====
+user
+lab_user
+lab_user
+DONE

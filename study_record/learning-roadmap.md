@@ -50,10 +50,11 @@
 - MySQL：my.cnf 搜索路径、mysqld --verbose --help、GLOBAL/SESSION/PERSIST/PERSIST_ONLY、动态 vs 需重启参数
 - 实验：改参数三张表（在线/仅新连接/需重启）+ SET PERSIST 重启验证
 
-### ENV-007 登录与认证（M，P0，生产向，未开始）
+### ENV-007 登录与认证（M，P0，生产向，✅ 已完成 2026-09-01）
 - PG：Role + pg_hba.conf + trust/md5/scram
 - MySQL：socket/TCP/localhost/IP、user@host 匹配、authentication_policy、caching_sha2_password、.my.cnf/login-path
 - 实验：三种连接路线身份验证（USER()/CURRENT_USER()/CURRENT_ROLE()）；登录失败 Runbook
+- 产出：`study_record/env/ENV-007_authentication/`（对照文章 + 4 evidence；host 匹配/TLS-2061/login-path 实测）
 
 ## ENG InnoDB 架构（MySQL 独有，无 PG 直接对应）
 
@@ -212,7 +213,7 @@
 |---|---|---|---|
 | 1 | 实例架构与生命周期 | ENV-005 | 进行中 2026-08-28 |
 | 2 | 配置文件与参数体系 | ENV-006 | ✅ 已完成 2026-09-01 |
-| 3 | 登录与认证 | ENV-007 | 未开始 |
+| 3 | 登录与认证 | ENV-007 | ✅ 已完成 2026-09-01 |
 | 4 | 账号与权限体系 | ENV-004 | ✅ 已完成 |
 
 ### 第二阶段：能理解 MySQL 正在发生什么（P0）

@@ -15,5 +15,8 @@ PG 18.4 → MySQL 8.4 对照学习记录与文章仓库。
 ## 已完成
 
 - ENV-004 账号权限体系（对照文章 + 15+ 组实验 + 10 evidence）
-- ENV-005 实例架构与生命周期（生产向 P0，本轮）
+- ENV-005 实例架构与生命周期（文章已产出，待理解验证）
+- ENV-006 配置文件与参数体系（✅ 2026-09-01，含 SET PERSIST 重启验证 + variables_info 修正）
+- ENV-007 登录与认证（✅ 2026-09-01，连接路线/host 匹配/caching_sha2-TLS/login-path）
 - MYSQL-BASIC-001 基础命令对照（26 类实验 + 22 QA）
+- troubleshooting CASE-001/002（✅ 2026-09-01，登录失败与权限拒绝实跑成文）
