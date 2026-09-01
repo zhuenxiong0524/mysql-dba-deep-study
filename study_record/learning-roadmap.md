@@ -39,7 +39,7 @@
 - PG：role/privilege/GRANT；MySQL：mysql.user + 账号权限 + 角色
 - 实验：同权限矩阵两边执行；8.4 默认 caching_sha2_password（PG trust/scram 对照）
 
-### ENV-005 实例架构与生命周期（S，P0，生产向，进行中 2026-08-28）
+### ENV-005 实例架构与生命周期（S，P0，生产向，✅ 已完成 2026-09-01）
 - PG 基线：postmaster/backend 进程模型、postgresql.conf、data dir、pg_ctl、error log
 - MySQL：mysqld 单进程多线程（连接线程 + InnoDB 后台线程族）、Server Layer + Storage Engine、datadir 构成
 - 实验：ps/ss/systemctl（本机无 systemd 单元）、@@datadir/@@basedir/@@pid_file/@@log_error、error log 启动日志、P_S=OFF 现状
@@ -73,7 +73,7 @@
 
 ## MVCC
 
-### MVCC-001 事务版本链、可见性与清理（L，P0，首专题）
+### MVCC-001 事务版本链、可见性与清理（L，P0，✅ 已完成 2026-09-01）
 - PG 基线：tuple xmin/xmax、snapshot、vacuum/autovacuum
 - MySQL：undo log（insert/update undo）、roll_ptr 版本链、ReadView（m_ids/low_limit_id/up_limit_id）、purge 线程 + history list
 - 运维视角：history list 长度过长（大事务/长查询拖住 purge）、undo 膨胀排查
@@ -118,7 +118,7 @@
 
 ## IDX 索引
 
-### IDX-001 B+tree、聚簇与覆盖索引（M，P1）
+### IDX-001 B+tree、聚簇与覆盖索引（M，P1，✅ 已完成 2026-09-01）
 - PG：堆表 + B-tree 索引 + 回表；INCLUDE 索引；MySQL：InnoDB 聚簇索引（主键即数据）+ 二级索引回主键 + 覆盖索引
 - 实验：同表同查询 EXPLAIN 对照（回表 vs 覆盖）；页结构对比（PG bufpage vs InnoDB page 头）
 - 源码：PG src/backend/access/nbtree/；MySQL storage/innobase/btr/btr0cur.cc、page/page0cur.cc
@@ -221,8 +221,8 @@
 |---|---|---|---|
 | 5 | InnoDB 架构 | ENG-001 | ✅ 已完成 2026-09-01 |
 | 6 | 表空间/文件/容量 | ENG-002 | ✅ 已完成 2026-09-01 |
-| 7 | Clustered Index 与回表 | IDX-001 | 未开始 |
-| 8 | 事务/MVCC/Undo | MVCC-001 | 未开始 |
+| 7 | Clustered Index 与回表 | IDX-001 | ✅ 已完成 2026-09-01 |
+| 8 | 事务/MVCC/Undo | MVCC-001 | ✅ 已完成 2026-09-01 |
 | 9 | 锁/Gap/Next-Key/死锁 | ISO-001 | 未开始 |
 
 ### 第三阶段：数据出问题能恢复（P0）

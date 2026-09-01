@@ -1,0 +1,733 @@
+IDX-001 source evidence
+MySQL source: /data/myhome/mydata/mysql-src/mysql-8.4.10
+PostgreSQL source: /data/soft/postgres/postgresql-18.4
+Captured: 2026-09-01
+
+===== MySQL 8.4.10 =====
+  3169	static dict_index_t *dict_index_build_internal_non_clust(
+  3170	    const dict_table_t *table, /*!< in: table */
+  3171	    dict_index_t *index)       /*!< in: user representation of
+  3172	                               a non-clustered index */
+  3173	{
+  3174	  dict_field_t *field;
+  3175	  dict_index_t *new_index;
+  3176	  dict_index_t *clust_index;
+  3177	  ulint i;
+  3178	  bool *indexed;
+  3179
+  3180	  ut_ad(table && index);
+  3181	  ut_ad(!index->is_clustered());
+  3182	  ut_ad(!dict_index_is_ibuf(index));
+  3183	  ut_ad(!dict_sys_mutex_own());
+  3184	  ut_ad(table->magic_n == DICT_TABLE_MAGIC_N);
+  3185
+  3186	  /* The clustered index should be the first in the list of indexes */
+  3187	  clust_index = UT_LIST_GET_FIRST(table->indexes);
+  3188
+  3189	  ut_ad(clust_index);
+  3190	  ut_ad(clust_index->is_clustered());
+  3191	  ut_ad(!dict_index_is_ibuf(clust_index));
+  3192
+  3193	  /* Create a new index */
+  3194	  new_index = dict_mem_index_create(table->name.m_name, index->name,
+  3195	                                    index->space, index->type,
+  3196	                                    index->n_fields + 1 + clust_index->n_uniq);
+  3197
+  3198	  /* Copy other relevant data from the old index
+  3199	  struct to the new struct: it inherits the values */
+  3200
+  3201	  new_index->n_user_defined_cols = index->n_fields;
+  3202
+  3203	  new_index->id = index->id;
+  3204
+  3205	  /* Copy fields from index to new_index */
+  3206	  dict_index_copy(new_index, index, table, 0, index->n_fields);
+  3207
+  3208	  /* Remember the table columns already contained in new_index */
+  3209	  indexed = static_cast<bool *>(ut::zalloc_withkey(
+  3210	      UT_NEW_THIS_FILE_PSI_KEY, table->n_cols * sizeof *indexed));
+  3211
+  3212	  /* Mark the table columns already contained in new_index */
+  3213	  for (i = 0; i < new_index->n_def; i++) {
+  3214	    field = new_index->get_field(i);
+  3215
+  3216	    if (field->col->is_virtual()) {
+  3217	      continue;
+  3218	    }
+  3219
+  3220	    /* If there is only a prefix of the column in the index
+  3221	    field, do not mark the column as contained in the index */
+  3222
+  3223	    if (field->prefix_len == 0) {
+  3224	      indexed[field->col->ind] = true;
+  3225	    }
+  3226	  }
+  3227
+  3228	  /* Add to new_index the columns necessary to determine the clustered
+  3229	  index entry uniquely */
+  3230
+  3231	  for (i = 0; i < clust_index->n_uniq; i++) {
+  3232	    field = clust_index->get_field(i);
+  3233
+  3234	    if (!indexed[field->col->ind]) {
+  3235	      dict_index_add_col(new_index, table, field->col, field->prefix_len,
+  3236	                         field->is_ascending);
+  3237	    } else if (dict_index_is_spatial(index)) {
+  3238	      /*For spatial index, we still need to add the
+  3239	      field to index. */
+  3240	      dict_index_add_col(new_index, table, field->col, field->prefix_len,
+  3241	                         field->is_ascending);
+  3242	    }
+  3243	  }
+  3244
+  3245	  ut::free(indexed);
+  3246
+  3247	  if (dict_index_is_unique(index)) {
+  3248	    new_index->n_uniq = index->n_fields;
+  3249	  } else {
+  3250	    new_index->n_uniq = new_index->n_def;
+  3251	  }
+  3252
+  3253	  /* Set the n_fields value in new_index to the actual defined
+  3254	  number of fields */
+  3255
+  3256	  new_index->n_fields = new_index->n_def;
+  3257
+  3258	  new_index->cached = true;
+  3259
+  3260	  return (new_index);
+  6668	      return (1536);
+  6669	    default:
+  6670	      return (3500);
+  6671	  }
+  6672	}
+  6673
+  6674	/** Determines if the primary key is clustered index.
+  6675	 @return true */
+  6676
+  6677	bool ha_innobase::primary_key_is_clustered() const { return (true); }
+  6678
+  6679	bool create_table_info_t::normalize_table_name(char *norm_name,
+  6680	                                               const char *name) {
+  6681	  const char *name_ptr;
+  6682	  ulint name_len;
+ 10410	overwrap, we use this test only as a secondary way of determining the
+ 10411	start of a new SQL statement. */
+ 10412
+ 10413	/** Positions an index cursor to the index specified in the handle. Fetches the
+ 10414	 row if any.
+ 10415	 @return 0, HA_ERR_KEY_NOT_FOUND, or error number */
+ 10416
+ 10417	int ha_innobase::index_read(
+ 10418	    uchar *buf,                      /*!< in/out: buffer for the returned
+ 10419	                                     row */
+ 10420	    const uchar *key_ptr,            /*!< in: key value; if this is NULL
+ 10421	                                     we position the cursor at the
+ 10422	                                     start or end of index; this can
+ 10423	                                     also contain an InnoDB row id, in
+ 10424	                                     which case key_len is the InnoDB
+ 10425	                                     row id length; the key value can
+ 10426	                                     also be a prefix of a full key value,
+ 10427	                                     and the last column can be a prefix
+ 10428	                                     of a full column */
+ 10429	    uint key_len,                    /*!< in: key value length */
+ 10430	    enum ha_rkey_function find_flag) /*!< in: search flags from my_base.h */
+ 10431	{
+ 10432	  DBUG_TRACE;
+ 10433	  DEBUG_SYNC_C("ha_innobase_index_read_begin");
+ 10434
+ 10435	  ut_a(m_prebuilt->trx == thd_to_trx(m_user_thd));
+ 10436	  ut_ad(key_len != 0 || find_flag != HA_READ_KEY_EXACT);
+ 10437
+ 10438	  ha_statistic_increment(&System_status_var::ha_read_key_count);
+ 10439
+ 10440	  dict_index_t *index = m_prebuilt->index;
+ 10441
+ 10442	  if (index == nullptr || index->is_corrupted()) {
+ 10443	    m_prebuilt->index_usable = false;
+ 10444	    return HA_ERR_CRASHED;
+ 10445	  }
+ 10446
+ 10447	  if (!m_prebuilt->index_usable) {
+ 10448	    return index->is_corrupted() ? HA_ERR_INDEX_CORRUPT
+ 10449	                                 : HA_ERR_TABLE_DEF_CHANGED;
+ 10450	  }
+ 10451
+ 10452	  if (index->type & DICT_FTS) {
+ 10453	    return HA_ERR_KEY_NOT_FOUND;
+ 10454	  }
+ 10455
+ 10456	  /* For R-Tree index, we will always place the page lock to
+ 10457	  pages being searched */
+ 10458	  if (dict_index_is_spatial(index)) {
+ 10459	    ++m_prebuilt->trx->will_lock;
+ 10460	  }
+ 10461
+ 10462	  /* Note that if the index for which the search template is built is not
+ 10463	  necessarily m_prebuilt->index, but can also be the clustered index */
+ 10464
+ 10465	  if (m_prebuilt->sql_stat_start && !can_reuse_mysql_template()) {
+ 10466	    build_template(false);
+ 10467	  }
+ 10468
+ 10469	#if defined(UNIV_DEBUG) && !defined(UNIV_DEBUG_VALGRIND)
+ 10470	  /* valgrind complains about some of uninitialized bytes. skip it for now. */
+ 10471	  if (m_prebuilt->sql_stat_start && can_reuse_mysql_template()) {
+ 10472	    /* confirm mysql_template contents are same */
+ 10473	    const auto n_template_save = m_prebuilt->n_template;
+ 10474	    mysql_row_templ_t *mysql_template_save = m_prebuilt->mysql_template;
+ 10475	    m_prebuilt->mysql_template = nullptr;
+ 10476	    build_template(false);
+ 10477	    ut_a(m_prebuilt->n_template == n_template_save);
+ 10478	    ut_a(!memcmp(m_prebuilt->mysql_template, mysql_template_save,
+ 10479	                 m_prebuilt->n_template * sizeof(mysql_row_templ_t)));
+ 10480	    ut::free(m_prebuilt->mysql_template);
+ 10481	    m_prebuilt->mysql_template = mysql_template_save;
+ 10482	  }
+ 10483	#endif /* UNIV_DEBUG && !UNIV_DEBUG_VALGRIND */
+ 10484
+ 10485	  if (key_ptr != nullptr) {
+ 10486	    /* Convert the search key value to InnoDB format into
+ 10487	    m_prebuilt->search_tuple */
+ 10488
+ 10489	    row_sel_convert_mysql_key_to_innobase(
+ 10490	        m_prebuilt->search_tuple, m_prebuilt->srch_key_val1,
+ 10491	        m_prebuilt->srch_key_val_len, index, key_ptr, key_len);
+ 10492
+ 10493	    assert(m_prebuilt->search_tuple->n_fields > 0);
+ 10494	  } else {
+ 10495	    /* We position the cursor to the last or the first entry
+ 10496	    in the index */
+ 10497
+ 10498	    dtuple_set_n_fields(m_prebuilt->search_tuple, 0);
+ 10499	  }
+ 10500
+ 10501	  ut_ad(m_prebuilt->m_mysql_handler == this);
+ 10502	  m_prebuilt->m_stop_tuple_found = false;
+ 10503	  if (end_range != nullptr && m_prebuilt->is_reading_range()) {
+ 10504	    row_sel_convert_mysql_key_to_innobase(
+ 10505	        m_prebuilt->m_stop_tuple, m_prebuilt->srch_key_val2,
+ 10506	        m_prebuilt->srch_key_val_len, index, end_range->key, end_range->length);
+ 10507	  } else {
+ 10508	    dtuple_set_n_fields(m_prebuilt->m_stop_tuple, 0);
+ 10509	  }
+ 10510
+ 10511	  page_cur_mode_t mode = convert_search_mode_to_innobase(find_flag);
+ 10512
+ 10513	  ulint match_mode = 0;
+ 10514
+ 10515	  if (find_flag == HA_READ_KEY_EXACT) {
+ 10516	    match_mode = ROW_SEL_EXACT;
+ 10517
+ 10518	  } else if (find_flag == HA_READ_PREFIX_LAST) {
+ 10519	    match_mode = ROW_SEL_EXACT_PREFIX;
+ 10520	  }
+ 10521
+ 10522	  m_last_match_mode = (uint)match_mode;
+ 10523
+ 10524	  dberr_t ret;
+ 10525
+ 10526	  if (mode != PAGE_CUR_UNSUPP) {
+ 10527	    ret = innobase_srv_conc_enter_innodb(m_prebuilt);
+ 10528
+ 10529	    if (ret != DB_SUCCESS) {
+ 10530	      return convert_error_code_to_mysql(ret, m_prebuilt->table->flags,
+ 10531	                                         m_user_thd);
+ 10532	    }
+ 10533
+ 10534	    if (!m_prebuilt->table->is_intrinsic()) {
+ 10535	      if (TrxInInnoDB::is_aborted(m_prebuilt->trx)) {
+ 10536	        innobase_rollback(ht, m_user_thd, false);
+ 10537
+ 10538	        return convert_error_code_to_mysql(DB_FORCED_ABORT, 0, m_user_thd);
+ 10539	      }
+ 10540
+ 10541	      m_prebuilt->ins_sel_stmt = thd_is_ins_sel_stmt(m_user_thd);
+ 10542
+ 10543	      ret = row_search_mvcc(buf, mode, m_prebuilt, match_mode, 0);
+ 10544
+ 10545	    } else {
+ 10546	      m_prebuilt->session = thd_to_innodb_session(m_user_thd);
+ 10547
+ 10548	      ret = row_search_no_mvcc(buf, mode, m_prebuilt, match_mode, 0);
+ 10549	    }
+ 10550
+ 10551	    innobase_srv_conc_exit_innodb(m_prebuilt);
+ 10552	  } else {
+ 10553	    ret = DB_UNSUPPORTED;
+ 10554	  }
+ 10555
+  5428	  /* Check if the record matches the index condition. */
+  5429	  switch (row_search_idx_cond_check(buf, prebuilt, rec, offsets)) {
+  5430	    case ICP_NO_MATCH:
+  5431	      prebuilt->try_unlock(true);
+  5432	      goto next_rec;
+  5433	    case ICP_OUT_OF_RANGE:
+  5434	      err = DB_RECORD_NOT_FOUND;
+  5435	      prebuilt->try_unlock(true);
+  5436	      goto idx_cond_failed;
+  5437	    case ICP_MATCH:
+  5438	      break;
+  5439	  }
+  5440
+  5441	  /* Get the clustered index record if needed, if we did not do the
+  5442	  search using the clustered index. */
+  5443
+  5444	  if (index != clust_index && prebuilt->need_to_access_clustered) {
+  5445	  requires_clust_rec:
+  5446	    ut_ad(index != clust_index);
+  5447	    /* We use a 'goto' to the preceding label if a consistent
+  5448	    read of a secondary index record requires us to look up old
+  5449	    versions of the associated clustered index record. */
+  5450
+  5451	    ut_ad(rec_offs_validate(rec, index, offsets));
+  5452
+  5453	    /* It was a non-clustered index and we must fetch also the
+  5454	    clustered index record */
+  5455
+  5456	    mtr_has_extra_clust_latch = true;
+  5457
+  5458	    ut_ad(!vrow);
+  5459
+  5460	    /* The following call returns 'offsets' associated with
+  5461	    'clust_rec'. Note that 'clust_rec' can be an old version
+  5462	    built for a consistent read. */
+  5463	    err = row_sel_get_clust_rec_for_mysql(
+  5464	        prebuilt, index, rec, thr, &clust_rec, &offsets, &heap,
+  5465	        need_vrow ? &vrow : nullptr, &mtr, prebuilt->get_lob_undo());
+  5466	    switch (err) {
+  5467	      case DB_SUCCESS:
+  5468	        if (clust_rec == nullptr) {
+  5469	          /* The record did not exist in the read view */
+  5470	          ut_ad(prebuilt->select_lock_type == LOCK_NONE ||
+  5471	                dict_index_is_spatial(index));
+  5472
+  5473	          goto next_rec;
+  5474	        }
+  5475	        break;
+  5476	      case DB_SKIP_LOCKED:
+  5477	        goto next_rec;
+  5478	      case DB_SUCCESS_LOCKED_REC:
+  5479	        ut_a(clust_rec != nullptr);
+  5480	        if (trx->releases_non_matching_rows()) {
+  3048
+  3049	  if (rebuild) {
+  3050	    ulint primary_key_number;
+  3051
+  3052	    if (new_primary) {
+  3053	      if (n_add == 0) {
+  3054	        assert(got_default_clust);
+  3055	        assert(altered_table->s->primary_key == 0);
+  3056	        primary_key_number = 0;
+  3057	      } else if (ha_alter_info->handler_flags &
+  3058	                 Alter_inplace_info::ALTER_COLUMN_NOT_NULLABLE) {
+  3059	        primary_key_number = altered_table->s->primary_key;
+  3060	      } else {
+  3061	        primary_key_number = *add;
+  3062	      }
+  3063	    } else if (got_default_clust) {
+  3064	      /* Create the GEN_CLUST_INDEX */
+  3065	      ddl::Index_defn *index_def = indexdef++;
+  3066
+  3067	      index_def->m_fields = nullptr;
+  3068	      index_def->m_n_fields = 0;
+  3069	      index_def->m_ind_type = DICT_CLUSTERED;
+  3070	      index_def->m_name = innobase_index_reserve_name;
+  3071	      index_def->m_rebuild = true;
+  3072	      index_def->m_key_number = std::numeric_limits<size_t>::max();
+  3073	      index_def->m_is_ngram = false;
+  3074	      primary_key_number = ULINT_UNDEFINED;
+  3075	      goto created_clustered;
+  3076	    } else {
+  3077	      primary_key_number = 0;
+  3078	    }
+  3079
+  3080	    /* Create the PRIMARY key index definition */
+  3081	    innobase_create_index_def(altered_table, new_dd_table, key_info,
+  3082	                              primary_key_number, true, true, indexdef++, heap);
+  3083
+  3084	  created_clustered:
+  3085	    n_add = 1;
+
+Additional MySQL MVCC caveat for a covering secondary scan:
+row0sel.cc:5353-5375 states that a non-clustered record whose visibility
+cannot be established from the secondary record must jump to
+requires_clust_rec, because undo is reachable through the clustered record.
+
+===== PostgreSQL 18.4 =====
+    73	 *		IndexNext
+    74	 *
+    75	 *		Retrieve a tuple from the IndexScan node's currentRelation
+    76	 *		using the index specified in the IndexScanState information.
+    77	 * ----------------------------------------------------------------
+    78	 */
+    79	static TupleTableSlot *
+    80	IndexNext(IndexScanState *node)
+    81	{
+    82		EState	   *estate;
+    83		ExprContext *econtext;
+    84		ScanDirection direction;
+    85		IndexScanDesc scandesc;
+    86		TupleTableSlot *slot;
+    87
+    88		/*
+    89		 * extract necessary information from index scan node
+    90		 */
+    91		estate = node->ss.ps.state;
+    92
+    93		/*
+    94		 * Determine which direction to scan the index in based on the plan's scan
+    95		 * direction and the current direction of execution.
+    96		 */
+    97		direction = ScanDirectionCombine(estate->es_direction,
+    98										 ((IndexScan *) node->ss.ps.plan)->indexorderdir);
+    99		scandesc = node->iss_ScanDesc;
+   100		econtext = node->ss.ps.ps_ExprContext;
+   101		slot = node->ss.ss_ScanTupleSlot;
+   102
+   103		if (scandesc == NULL)
+   104		{
+   105			/*
+   106			 * We reach here if the index scan is not parallel, or if we're
+   107			 * serially executing an index scan that was planned to be parallel.
+   108			 */
+   109			scandesc = index_beginscan(node->ss.ss_currentRelation,
+   110									   node->iss_RelationDesc,
+   111									   estate->es_snapshot,
+   112									   &node->iss_Instrument,
+   113									   node->iss_NumScanKeys,
+   114									   node->iss_NumOrderByKeys);
+   115
+   116			node->iss_ScanDesc = scandesc;
+   117
+   118			/*
+   119			 * If no run-time keys to calculate or they are ready, go ahead and
+   120			 * pass the scankeys to the index AM.
+   121			 */
+   122			if (node->iss_NumRuntimeKeys == 0 || node->iss_RuntimeKeysReady)
+   123				index_rescan(scandesc,
+   124							 node->iss_ScanKeys, node->iss_NumScanKeys,
+   125							 node->iss_OrderByKeys, node->iss_NumOrderByKeys);
+   126		}
+   127
+   128		/*
+   129		 * ok, now that we have what we need, fetch the next tuple.
+   130		 */
+   131		while (index_getnext_slot(scandesc, direction, slot))
+   132		{
+   133			CHECK_FOR_INTERRUPTS();
+   134
+   135			/*
+   136			 * If the index was lossy, we have to recheck the index quals using
+   137			 * the fetched tuple.
+   138			 */
+   139			if (scandesc->xs_recheck)
+   140			{
+   141				econtext->ecxt_scantuple = slot;
+   142				if (!ExecQualAndReset(node->indexqualorig, econtext))
+   143				{
+   144					/* Fails recheck, so drop it and loop back for another */
+   145					InstrCountFiltered2(node, 1);
+   660	/* ----------------
+   661	 *		index_fetch_heap - get the scan's next heap tuple
+   662	 *
+   663	 * The result is a visible heap tuple associated with the index TID most
+   664	 * recently fetched by index_getnext_tid, or NULL if no more matching tuples
+   665	 * exist.  (There can be more than one matching tuple because of HOT chains,
+   666	 * although when using an MVCC snapshot it should be impossible for more than
+   667	 * one such tuple to exist.)
+   668	 *
+   669	 * On success, the buffer containing the heap tup is pinned (the pin will be
+   670	 * dropped in a future index_getnext_tid, index_fetch_heap or index_endscan
+   671	 * call).
+   672	 *
+   673	 * Note: caller must check scan->xs_recheck, and perform rechecking of the
+   674	 * scan keys if required.  We do not do that here because we don't have
+   675	 * enough information to do it efficiently in the general case.
+   676	 * ----------------
+   677	 */
+   678	bool
+   679	index_fetch_heap(IndexScanDesc scan, TupleTableSlot *slot)
+   680	{
+   681		bool		all_dead = false;
+   682		bool		found;
+   683
+   684		found = table_index_fetch_tuple(scan->xs_heapfetch, &scan->xs_heaptid,
+   685										scan->xs_snapshot, slot,
+   686										&scan->xs_heap_continue, &all_dead);
+   687
+   688		if (found)
+   689			pgstat_count_heap_fetch(scan->indexRelation);
+   690
+   691		/*
+   692		 * If we scanned a whole HOT chain and found only dead tuples, tell index
+   693		 * AM to kill its entry for that TID (this will take effect in the next
+   694		 * amgettuple call, in index_getnext_tid).  We do not do this when in
+   695		 * recovery because it may violate MVCC to do so.  See comments in
+   696		 * RelationGetIndexScan().
+   697		 */
+   698		if (!scan->xactStartedInRecovery)
+   699			scan->kill_prior_tuple = all_dead;
+   700
+   701		return found;
+   702	}
+   703
+   704	/* ----------------
+   705	 *		index_getnext_slot - get the next tuple from a scan
+   706	 *
+   707	 * The result is true if a tuple satisfying the scan keys and the snapshot was
+   708	 * found, false otherwise.  The tuple is stored in the specified slot.
+   709	 *
+   710	 * On success, resources (like buffer pins) are likely to be held, and will be
+   711	 * dropped by a future index_getnext_tid, index_fetch_heap or index_endscan
+   712	 * call).
+   713	 *
+   714	 * Note: caller must check scan->xs_recheck, and perform rechecking of the
+   715	 * scan keys if required.  We do not do that here because we don't have
+   716	 * enough information to do it efficiently in the general case.
+   717	 * ----------------
+   718	 */
+   719	bool
+   720	index_getnext_slot(IndexScanDesc scan, ScanDirection direction, TupleTableSlot *slot)
+   721	{
+   722		for (;;)
+   723		{
+   724			if (!scan->xs_heap_continue)
+   725			{
+   726				ItemPointer tid;
+   727
+   728				/* Time to fetch the next TID from the index */
+   729				tid = index_getnext_tid(scan, direction);
+   730
+   731				/* If we're out of index entries, we're done */
+   732				if (tid == NULL)
+   733					break;
+   734
+   735				Assert(ItemPointerEquals(tid, &scan->xs_heaptid));
+    55	 *		IndexOnlyNext
+    56	 *
+    57	 *		Retrieve a tuple from the IndexOnlyScan node's index.
+    58	 * ----------------------------------------------------------------
+    59	 */
+    60	static TupleTableSlot *
+    61	IndexOnlyNext(IndexOnlyScanState *node)
+    62	{
+    63		EState	   *estate;
+    64		ExprContext *econtext;
+    65		ScanDirection direction;
+    66		IndexScanDesc scandesc;
+    67		TupleTableSlot *slot;
+    68		ItemPointer tid;
+    69
+    70		/*
+    71		 * extract necessary information from index scan node
+    72		 */
+    73		estate = node->ss.ps.state;
+    74
+    75		/*
+    76		 * Determine which direction to scan the index in based on the plan's scan
+    77		 * direction and the current direction of execution.
+    78		 */
+    79		direction = ScanDirectionCombine(estate->es_direction,
+    80										 ((IndexOnlyScan *) node->ss.ps.plan)->indexorderdir);
+    81		scandesc = node->ioss_ScanDesc;
+    82		econtext = node->ss.ps.ps_ExprContext;
+    83		slot = node->ss.ss_ScanTupleSlot;
+    84
+    85		if (scandesc == NULL)
+    86		{
+    87			/*
+    88			 * We reach here if the index only scan is not parallel, or if we're
+    89			 * serially executing an index only scan that was planned to be
+    90			 * parallel.
+    91			 */
+    92			scandesc = index_beginscan(node->ss.ss_currentRelation,
+    93									   node->ioss_RelationDesc,
+    94									   estate->es_snapshot,
+    95									   &node->ioss_Instrument,
+    96									   node->ioss_NumScanKeys,
+    97									   node->ioss_NumOrderByKeys);
+    98
+    99			node->ioss_ScanDesc = scandesc;
+   100
+   101
+   102			/* Set it up for index-only scan */
+   103			node->ioss_ScanDesc->xs_want_itup = true;
+   104			node->ioss_VMBuffer = InvalidBuffer;
+   105
+   106			/*
+   107			 * If no run-time keys to calculate or they are ready, go ahead and
+   108			 * pass the scankeys to the index AM.
+   109			 */
+   110			if (node->ioss_NumRuntimeKeys == 0 || node->ioss_RuntimeKeysReady)
+   111				index_rescan(scandesc,
+   112							 node->ioss_ScanKeys,
+   113							 node->ioss_NumScanKeys,
+   114							 node->ioss_OrderByKeys,
+   115							 node->ioss_NumOrderByKeys);
+   116		}
+   117
+   118		/*
+   119		 * OK, now that we have what we need, fetch the next tuple.
+   120		 */
+   121		while ((tid = index_getnext_tid(scandesc, direction)) != NULL)
+   122		{
+   123			bool		tuple_from_heap = false;
+   124
+   125			CHECK_FOR_INTERRUPTS();
+   126
+   127			/*
+   128			 * We can skip the heap fetch if the TID references a heap page on
+   129			 * which all tuples are known visible to everybody.  In any case,
+   130			 * we'll use the index tuple not the heap tuple as the data source.
+   131			 *
+   132			 * Note on Memory Ordering Effects: visibilitymap_get_status does not
+   133			 * lock the visibility map buffer, and therefore the result we read
+   134			 * here could be slightly stale.  However, it can't be stale enough to
+   135			 * matter.
+   136			 *
+   137			 * We need to detect clearing a VM bit due to an insert right away,
+   138			 * because the tuple is present in the index page but not visible. The
+   139			 * reading of the TID by this scan (using a shared lock on the index
+   140			 * buffer) is serialized with the insert of the TID into the index
+   141			 * (using an exclusive lock on the index buffer). Because the VM bit
+   142			 * is cleared before updating the index, and locking/unlocking of the
+   143			 * index page acts as a full memory barrier, we are sure to see the
+   144			 * cleared bit if we see a recently-inserted TID.
+   145			 *
+   146			 * Deletes do not update the index page (only VACUUM will clear out
+   147			 * the TID), so the clearing of the VM bit by a delete is not
+   148			 * serialized with this test below, and we may see a value that is
+   149			 * significantly stale. However, we don't care about the delete right
+   150			 * away, because the tuple is still visible until the deleting
+   151			 * transaction commits or the statement ends (if it's our
+   152			 * transaction). In either case, the lock on the VM buffer will have
+   153			 * been released (acting as a write barrier) after clearing the bit.
+   154			 * And for us to have a snapshot that includes the deleting
+   155			 * transaction (making the tuple invisible), we must have acquired
+   156			 * ProcArrayLock after that time, acting as a read barrier.
+   157			 *
+   158			 * It's worth going through this complexity to avoid needing to lock
+   159			 * the VM buffer, which could cause significant contention.
+   160			 */
+   161			if (!VM_ALL_VISIBLE(scandesc->heapRelation,
+   162								ItemPointerGetBlockNumber(tid),
+   163								&node->ioss_VMBuffer))
+   164			{
+   165				/*
+   166				 * Rats, we have to visit the heap to check visibility.
+   167				 */
+   168				InstrCountTuples2(node, 1);
+   169				if (!index_fetch_heap(scandesc, node->ioss_TableSlot))
+   170					continue;		/* no visible tuple, try next index entry */
+   171
+   172				ExecClearTuple(node->ioss_TableSlot);
+   173
+   174				/*
+   175				 * Only MVCC snapshots are supported here, so there should be no
+   176				 * need to keep following the HOT chain once a visible entry has
+   177				 * been found.  If we did want to allow that, we'd need to keep
+   178				 * more state to remember not to call index_getnext_tid next time.
+   179				 */
+   180				if (scandesc->xs_heap_continue)
+   181					elog(ERROR, "non-MVCC snapshots are not supported in index-only scans");
+   182
+   183				/*
+   184				 * Note: at this point we are holding a pin on the heap page, as
+   185				 * recorded in scandesc->xs_cbuf.  We could release that pin now,
+   186				 * but it's not clear whether it's a win to do so.  The next index
+   187				 * entry might require a visit to the same heap page.
+   188				 */
+   189
+   190				tuple_from_heap = true;
+   191			}
+   192
+   193			/*
+   194			 * Fill the scan tuple slot with data from the index.  This might be
+   195			 * provided in either HeapTuple or IndexTuple format.  Conceivably an
+  2160			ListCell   *l;
+  2161
+  2162			foreach(l, apath->bitmapquals)
+  2163			{
+  2164				find_indexpath_quals((Path *) lfirst(l), quals, preds);
+  2165			}
+  2166		}
+  2167		else if (IsA(bitmapqual, BitmapOrPath))
+  2168		{
+  2169			BitmapOrPath *opath = (BitmapOrPath *) bitmapqual;
+  2170			ListCell   *l;
+  2171
+  2172			foreach(l, opath->bitmapquals)
+  2173			{
+  2174				find_indexpath_quals((Path *) lfirst(l), quals, preds);
+  2175			}
+  2176		}
+  2177		else if (IsA(bitmapqual, IndexPath))
+  2178		{
+  2179			IndexPath  *ipath = (IndexPath *) bitmapqual;
+  2180			ListCell   *l;
+  2181
+  2182			foreach(l, ipath->indexclauses)
+  2183			{
+  2184				IndexClause *iclause = (IndexClause *) lfirst(l);
+  2185
+  2186				*quals = lappend(*quals, iclause->rinfo->clause);
+  2187			}
+  2188			*preds = list_concat(*preds, ipath->indexinfo->indpred);
+  2189		}
+  2190		else
+  2191			elog(ERROR, "unrecognized node type: %d", nodeTag(bitmapqual));
+  2192	}
+  2193
+  2194
+  2195	/*
+  2196	 * find_list_position
+  2197	 *		Return the given node's position (counting from 0) in the given
+  2198	 *		list of nodes.  If it's not equal() to any existing list member,
+  2199	 *		add it at the end, and return that position.
+  2200	 */
+  2201	static int
+  2202	find_list_position(Node *node, List **nodelist)
+  2203	{
+  2204		int			i;
+  2205		ListCell   *lc;
+  2206
+  2207		i = 0;
+  2208		foreach(lc, *nodelist)
+  2209		{
+  2210			Node	   *oldnode = (Node *) lfirst(lc);
+  2211
+  2212			if (equal(node, oldnode))
+  2213				return i;
+  2214			i++;
+  2215		}
+  2216
+  2217		*nodelist = lappend(*nodelist, node);
+  2218
+  2219		return i;
+  2220	}
+  2221
+  2222
+  2223	/*
+  2224	 * check_index_only
+  2225	 *		Determine whether an index-only scan is possible for this index.
+  2226	 */
+  2227	static bool
+  2228	check_index_only(RelOptInfo *rel, IndexOptInfo *index)
+  2229	{
+  2230		bool		result;
+  2231		Bitmapset  *attrs_used = NULL;
+  2232		Bitmapset  *index_canreturn_attrs = NULL;
+  2233		ListCell   *lc;
+  2234		int			i;
+  2235
+  2236		/* Index-only scans must be enabled */
+  2237		if (!enable_indexonlyscan)
+  2238			return false;
+  2239
+  2240		/*
+  2241		 * Check that all needed attributes of the relation are available from the
+  2242		 * index.
+  2243		 */
+  2244
+  2245		/*

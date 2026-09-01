@@ -1,0 +1,13 @@
+IDX-001 environment cleanup (2026-09-01)
+
+MySQL command:
+  DROP DATABASE mysql_idx001;
+  SELECT SCHEMA_NAME ... WHERE SCHEMA_NAME='mysql_idx001';
+Result: no row returned.
+
+PostgreSQL command:
+  DROP DATABASE pg_idx001;
+  SELECT datname ... WHERE datname='pg_idx001';
+Result:
+  DROP DATABASE
+  no row returned.

@@ -1,0 +1,840 @@
+MVCC-001 source evidence
+MySQL: /data/myhome/mydata/mysql-src/mysql-8.4.10
+PostgreSQL: /data/soft/postgres/postgresql-18.4
+Captured: 2026-09-01
+
+===== MySQL 8.4.10 =====
+    48	class ReadView {
+    49	  /** This is similar to a std::vector but it is not a drop
+    50	  in replacement. It is specific to ReadView. */
+    51	  class ids_t {
+    52	    typedef trx_ids_t::value_type value_type;
+    53
+    54	    /**
+    55	    Constructor */
+    56	    ids_t() : m_ptr(), m_size(), m_reserved() {}
+    57
+    58	    /**
+    59	    Destructor */
+    60	    ~ids_t() { ut::delete_arr(m_ptr); }
+    61
+    62	    /** Try and increase the size of the array. Old elements are copied across.
+    63	    It is a no-op if n is < current size.
+    64	    @param n            Make space for n elements */
+    65	    void reserve(ulint n);
+    66
+    67	    /**
+    68	    Resize the array, sets the current element count.
+    69	    @param n            new size of the array, in elements */
+    70	    void resize(ulint n) {
+    71	      ut_ad(n <= capacity());
+    72
+    73	      m_size = n;
+    74	    }
+    75
+    76	    /**
+    77	    Reset the size to 0 */
+    78	    void clear() { resize(0); }
+    79
+    80	    /**
+    81	    @return the capacity of the array in elements */
+    82	    ulint capacity() const { return (m_reserved); }
+    83
+    84	    /**
+    85	    Copy and overwrite the current array contents
+    86
+    87	    @param start                Source array
+    88	    @param end          Pointer to end of array */
+    89	    void assign(const value_type *start, const value_type *end);
+    90
+    91	    /**
+    92	    Insert the value in the correct slot, preserving the order.
+    93	    Doesn't check for duplicates. */
+    94	    void insert(value_type value);
+    95
+    96	    /**
+    97	    @return the value of the first element in the array */
+    98	    value_type front() const {
+    99	      ut_ad(!empty());
+   100
+   101	      return (m_ptr[0]);
+   102	    }
+   103
+   104	    /**
+   105	    @return the value of the last element in the array */
+   106	    value_type back() const {
+   107	      ut_ad(!empty());
+   108
+   109	      return (m_ptr[m_size - 1]);
+   110	    }
+   111
+   112	    /**
+   113	    Append a value to the array.
+   114	    @param value                the value to append */
+   115	    void push_back(value_type value);
+   116
+   117	    /**
+   118	    @return a pointer to the start of the array */
+   119	    trx_id_t *data() { return (m_ptr); }
+   120
+   121	    /**
+   122	    @return a const pointer to the start of the array */
+   123	    const trx_id_t *data() const { return (m_ptr); }
+   124
+   125	    /**
+   126	    @return the number of elements in the array */
+   127	    ulint size() const { return (m_size); }
+   128
+   129	    /**
+   130	    @return true if size() == 0 */
+   131	    bool empty() const { return (size() == 0); }
+   132
+   133	   private:
+   134	    // Prevent copying
+   135	    ids_t(const ids_t &);
+   136	    ids_t &operator=(const ids_t &);
+   137
+   138	   private:
+   139	    /** Memory for the array */
+   140	    value_type *m_ptr;
+   141
+   142	    /** Number of active elements in the array */
+   143	    ulint m_size;
+   144
+   145	    /** Size of m_ptr in elements */
+   146	    ulint m_reserved;
+   147
+   148	    friend class ReadView;
+   149	  };
+   150
+   151	 public:
+   152	  ReadView();
+   153	  ~ReadView();
+   154	  /** Check whether transaction id is valid.
+   155	  @param[in]    id              transaction id to check
+   156	  @param[in]    name            table name */
+   157	  static void check_trx_id_sanity(trx_id_t id, const table_name_t &name);
+   158
+   159	  /** Check whether the changes by id are visible.
+   160	  @param[in]    id      transaction id to check against the view
+   161	  @param[in]    name    table name
+   162	  @return whether the view sees the modifications of id. */
+   163	  [[nodiscard]] bool changes_visible(trx_id_t id,
+   164	                                     const table_name_t &name) const {
+   165	    ut_ad(id > 0);
+   166
+   167	    if (id < m_up_limit_id || id == m_creator_trx_id) {
+   168	      return (true);
+   169	    }
+   170
+   171	    check_trx_id_sanity(id, name);
+   172
+   173	    if (id >= m_low_limit_id) {
+   174	      return (false);
+   175
+   176	    } else if (m_ids.empty()) {
+   177	      return (true);
+   178	    }
+   179
+   180	    const ids_t::value_type *p = m_ids.data();
+   181
+   182	    return (!std::binary_search(p, p + m_ids.size(), id));
+   183	  }
+   184
+   185	  /**
+   186	  @param id             transaction to check
+   187	  @return true if view sees transaction id */
+   188	  bool sees(trx_id_t id) const { return (id < m_up_limit_id); }
+   189
+   190	  /**
+   191	  Mark the view as closed */
+   192	  void close() {
+   193	    ut_ad(m_creator_trx_id != TRX_ID_MAX);
+   194	    m_creator_trx_id = TRX_ID_MAX;
+   195	  }
+  2308	  are never placed in the mysql_trx_list. */
+  2309	  ut_ad(trx->is_recovered);
+  2310	  ut_ad(!trx->in_rw_trx_list);
+  2311	  ut_ad(!trx->in_mysql_trx_list);
+  2312	  trx->state.store(TRX_STATE_NOT_STARTED, std::memory_order_relaxed);
+  2313	}
+  2314
+  2315	/** Assigns a read view for a consistent read query. All the consistent reads
+  2316	 within the same transaction will get the same read view, which is created
+  2317	 when this function is first called for a new started transaction.
+  2318	 @return consistent read view */
+  2319	ReadView *trx_assign_read_view(trx_t *trx) /*!< in/out: active transaction */
+  2320	{
+  2321	  ut_ad(trx_can_be_handled_by_current_thread_or_is_hp_victim(trx));
+  2322	  ut_ad(trx->state.load(std::memory_order_relaxed) == TRX_STATE_ACTIVE);
+  2323
+  2324	  if (srv_read_only_mode) {
+  2325	    ut_ad(trx->read_view == nullptr);
+  2326	    return (nullptr);
+  2327
+  2328	  } else if (!MVCC::is_view_active(trx->read_view)) {
+  2329	    trx_sys->mvcc->view_open(trx->read_view, trx);
+  2330	  }
+  2331
+  2332	  return (trx->read_view);
+  2333	}
+  2334
+  2335	/** Prepares a transaction for commit/rollback. */
+  2336	void trx_commit_or_rollback_prepare(trx_t *trx) /*!< in/out: transaction */
+  2337	{
+  2338	  /* We are reading trx->state without mutex protection here,
+  2339	  because the rollback should either be invoked for:
+  2340	    - a running active MySQL transaction associated
+storage/innobase/include/trx0rec.h:179:/** status bit used for trx_undo_prev_version_build() */
+storage/innobase/include/trx0rec.h:181:/** TRX_UNDO_PREV_IN_PURGE tells trx_undo_prev_version_build() that it
+storage/innobase/include/trx0rec.h:187:/** This tells trx_undo_prev_version_build() to fetch the old value in
+storage/innobase/include/trx0rec.h:228:bool trx_undo_prev_version_build(const rec_t *index_rec, mtr_t *index_mtr,
+storage/innobase/include/row0vers.h:115:dberr_t row_vers_build_for_consistent_read(
+storage/innobase/trx/trx0rec.cc:2447:bool trx_undo_prev_version_build(
+storage/innobase/row/row0pread.cc:649:        row_vers_build_for_consistent_read(rec, mtr, m_config.m_index, &offsets,
+storage/innobase/row/row0vers.cc:113:  that `trx_undo_prev_version_build` will try to retrieve clust_vrow, and the
+storage/innobase/row/row0vers.cc:252:    trx_undo_prev_version_build(
+storage/innobase/row/row0vers.cc:707:    trx_undo_prev_version_build(rec, mtr, version, clust_index, clust_offsets,
+storage/innobase/row/row0vers.cc:827:    trx_undo_prev_version_build(rec, mtr, version, clust_index, clust_offsets,
+storage/innobase/row/row0vers.cc:1147:    trx_undo_prev_version_build(
+storage/innobase/row/row0vers.cc:1249:dberr_t row_vers_build_for_consistent_read(
+storage/innobase/row/row0vers.cc:1294:        trx_undo_prev_version_build(rec, mtr, version, index, *offsets, heap,
+storage/innobase/row/row0vers.cc:1437:    if (!trx_undo_prev_version_build(rec, mtr, version, index, *offsets, heap,
+storage/innobase/row/row0sel.cc:714:  err = row_vers_build_for_consistent_read(rec, mtr, index, offsets, read_view,
+storage/innobase/row/row0sel.cc:3067:[[nodiscard]] static dberr_t row_sel_build_prev_vers_for_mysql(
+storage/innobase/row/row0sel.cc:3082:  err = row_vers_build_for_consistent_read(
+storage/innobase/row/row0sel.cc:3300:        err = row_sel_build_prev_vers_for_mysql(
+storage/innobase/row/row0sel.cc:5330:        err = row_sel_build_prev_vers_for_mysql(
+  5311	  } else {
+  5312	    /* This is a non-locking consistent read: if necessary, fetch
+  5313	    a previous version of the record */
+  5314
+  5315	    if (trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) {
+  5316	      /* Do nothing: we let a non-locking SELECT read the
+  5317	      latest version of the record */
+  5318
+  5319	    } else if (index == clust_index) {
+  5320	      /* Fetch a previous version of the row if the current
+  5321	      one is not visible in the snapshot; if we have a very
+  5322	      high force recovery level set, we try to avoid crashes
+  5323	      by skipping this lookup */
+  5324
+  5325	      if (srv_force_recovery < 5 &&
+  5326	          !lock_clust_rec_cons_read_sees(rec, index, offsets,
+  5327	                                         trx_get_read_view(trx))) {
+  5328	        rec_t *old_vers;
+  5329	        /* The following call returns 'offsets' associated with 'old_vers' */
+  5330	        err = row_sel_build_prev_vers_for_mysql(
+  5331	            trx->read_view, clust_index, prebuilt, rec, &offsets, &heap,
+  5332	            &old_vers, need_vrow ? &vrow : nullptr, &mtr,
+  5333	            prebuilt->get_lob_undo());
+  5334
+  5335	        if (err != DB_SUCCESS) {
+  5336	          goto lock_wait_or_error;
+  5337	        }
+  5338
+  5339	        if (old_vers == nullptr) {
+  5340	          /* The row did not exist yet in
+  5341	          the read view */
+  5342
+  5343	          goto next_rec;
+  5344	        }
+  5345
+  5346	        rec = old_vers;
+  5347	        prev_rec = rec;
+  5348	        ut_d(prev_rec_debug = row_search_debug_copy_rec_order_prefix(
+  5349	                 pcur, index, prev_rec, &prev_rec_debug_n_fields,
+  5350	                 &prev_rec_debug_buf, &prev_rec_debug_buf_size));
+  5351	      }
+  5352	    } else {
+  5353	      /* We are looking into a non-clustered index,
+  5354	      and to get the right version of the record we
+  5355	      have to look also into the clustered index: this
+  5356	      is necessary, because we can only get the undo
+  5357	      information via the clustered index record. */
+  5358
+  5359	      ut_ad(!index->is_clustered());
+  5360
+  5361	      if (!srv_read_only_mode &&
+  5362	          !lock_sec_rec_cons_read_sees(rec, index, trx->read_view)) {
+  5363	        /* We should look at the clustered index.
+  5364	        However, as this is a non-locking read,
+  5365	        we can skip the clustered index lookup if
+  5366	        the condition does not match the secondary
+  5367	        index entry. */
+  5368	        switch (row_search_idx_cond_check(buf, prebuilt, rec, offsets)) {
+  5369	          case ICP_NO_MATCH:
+  5370	            goto next_rec;
+  5371	          case ICP_OUT_OF_RANGE:
+  5372	            err = DB_RECORD_NOT_FOUND;
+  5373	            goto idx_cond_failed;
+  5374	          case ICP_MATCH:
+  5375	            goto requires_clust_rec;
+  5376	        }
+  5377
+  5378	        ut_error;
+   315	void trx_purge_add_update_undo_to_history(
+   316	    trx_t *trx,               /*!< in: transaction */
+   317	    trx_undo_ptr_t *undo_ptr, /*!< in/out: update undo log. */
+   318	    page_t *undo_page,        /*!< in: update undo log header page,
+   319	                              x-latched */
+   320	    bool update_rseg_history_len,
+   321	    /*!< in: if true: update rseg history
+   322	    len else skip updating it. */
+   323	    ulint n_added_logs, /*!< in: number of logs added */
+   324	    mtr_t *mtr)         /*!< in: mtr */
+   325	{
+   326	  trx_undo_t *undo;
+   327	  trx_rseg_t *rseg;
+   328	  trx_rsegf_t *rseg_header;
+   329	  trx_ulogf_t *undo_header;
+   330
+   331	  undo = undo_ptr->update_undo;
+   332	  rseg = undo->rseg;
+   333
+   334	  rseg_header = trx_rsegf_get(undo->rseg->space_id, undo->rseg->page_no,
+   335	                              undo->rseg->page_size, mtr);
+   336
+   337	  undo_header = undo_page + undo->hdr_offset;
+   338
+   339	  if (undo->state != TRX_UNDO_CACHED) {
+   340	    ulint hist_size;
+   341	#ifdef UNIV_DEBUG
+   342	    trx_usegf_t *seg_header = undo_page + TRX_UNDO_SEG_HDR;
+   343	#endif /* UNIV_DEBUG */
+   344
+   345	    /* The undo log segment will not be reused */
+   346
+   347	    if (UNIV_UNLIKELY(undo->id >= TRX_RSEG_N_SLOTS)) {
+   348	      ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_1165) << "undo->id is " << undo->id;
+   349	    }
+   350
+   351	    trx_rsegf_set_nth_undo(rseg_header, undo->id, FIL_NULL, mtr);
+   352
+   353	    MONITOR_DEC(MONITOR_NUM_UNDO_SLOT_USED);
+   354
+   355	    hist_size =
+   356	        mtr_read_ulint(rseg_header + TRX_RSEG_HISTORY_SIZE, MLOG_4BYTES, mtr);
+   357
+   358	    ut_ad(undo->size == flst_get_len(seg_header + TRX_UNDO_PAGE_LIST));
+   359
+   360	    mlog_write_ulint(rseg_header + TRX_RSEG_HISTORY_SIZE,
+   361	                     hist_size + undo->size, MLOG_4BYTES, mtr);
+   362	  }
+   363
+   364	  /* Add the log as the first in the history list */
+   365	  flst_add_first(rseg_header + TRX_RSEG_HISTORY,
+   366	                 undo_header + TRX_UNDO_HISTORY_NODE, mtr);
+   367
+   368	  if (update_rseg_history_len) {
+   369	    trx_sys->rseg_history_len.fetch_add(n_added_logs);
+   370	    if (trx_sys->rseg_history_len.load() >
+   371	        srv_n_purge_threads * srv_purge_batch_size) {
+   372	      srv_wake_purge_thread_if_not_active();
+   373	    }
+   374	  }
+   375
+   376	  /* Update maximum transaction number for this rollback segment. */
+   377	  mlog_write_ull(rseg_header + TRX_RSEG_MAX_TRX_NO, trx->no, mtr);
+   378
+   379	  /* Write the trx number to the undo log header */
+   380	  mlog_write_ull(undo_header + TRX_UNDO_TRX_NO, trx->no, mtr);
+   381
+   382	  /* Write information about delete markings to the undo log header */
+   383
+   384	  if (!undo->del_marks) {
+   385	    mlog_write_ulint(undo_header + TRX_UNDO_DEL_MARKS, false, MLOG_2BYTES, mtr);
+   386	  }
+   387
+   388	  /* Write GTID information if there. */
+   389	  trx_undo_gtid_write(trx, undo_header, undo, mtr, false);
+   390
+   391	  if (rseg->last_page_no == FIL_NULL) {
+   392	    rseg->last_page_no = undo->hdr_page_no;
+   393	    rseg->last_offset = undo->hdr_offset;
+   394	    rseg->last_trx_no = trx->no;
+   395	    rseg->last_del_marks = undo->del_marks;
+   396	  }
+   397	}
+   398
+   399	/** Remove an rseg header from the history list.
+   400	@param[in,out]  rseg_hdr        Rollback segment header
+   401	@param[in]      log_hdr         Undo log segment header
+   402	@param[in,out]  mtr             Mini-transaction. */
+   403	static void trx_purge_remove_log_hdr(trx_rsegf_t *rseg_hdr,
+   404	                                     trx_ulogf_t *log_hdr, mtr_t *mtr) {
+   405	  flst_remove(rseg_hdr + TRX_RSEG_HISTORY, log_hdr + TRX_UNDO_HISTORY_NODE,
+   406	              mtr);
+   407
+   408	  trx_sys->rseg_history_len.fetch_sub(1);
+   409	}
+   410
+  2910
+  2911	  if (n_use_threads == 0) {
+  2912	    n_use_threads = n_threads;
+  2913	  }
+  2914
+  2915	  do {
+  2916	    if (trx_sys->rseg_history_len.load() > rseg_history_len ||
+  2917	        (srv_max_purge_lag > 0 && rseg_history_len > srv_max_purge_lag)) {
+  2918	      /* History length is now longer than what it was
+  2919	      when we took the last snapshot. Use more threads. */
+  2920
+  2921	      if (n_use_threads < n_threads) {
+  2922	        ++n_use_threads;
+  2923	      }
+  2924
+  2925	    } else if (srv_check_activity(old_activity_count) && n_use_threads > 1) {
+  2926	      /* History length same or smaller since last snapshot,
+  2927	      use fewer threads. */
+  2928
+  2929	      --n_use_threads;
+  2930
+  2931	      old_activity_count = srv_get_activity_count();
+  2932	    }
+  2933
+  2934	    /* Ensure that the purge threads are less than what
+  2935	    was configured. */
+  2936
+  2937	    ut_a(n_use_threads > 0);
+  2938	    ut_a(n_use_threads <= n_threads);
+  2939
+  2940	    /* Take a snapshot of the history list before purge. */
+  2941	    if ((rseg_history_len = trx_sys->rseg_history_len.load()) == 0) {
+  2942	      break;
+  2943	    }
+  2944
+  2945	    bool do_truncate = need_explicit_truncate ||
+  2946	                       srv_shutdown_state.load() == SRV_SHUTDOWN_PURGE ||
+  2947	                       (++count % srv_purge_rseg_truncate_frequency) == 0;
+  2948
+  2949	    n_pages_purged =
+  2950	        trx_purge(n_use_threads, srv_purge_batch_size, do_truncate);
+  2951
+  2952	    *n_total_purged += n_pages_purged;
+  2953
+  2954	    need_explicit_truncate = (n_pages_purged == 0);
+  2955	    if (need_explicit_truncate) {
+  2956	      undo::spaces->s_lock();
+  2957	      need_explicit_truncate =
+  2958	          (undo::spaces->find_first_inactive_explicit(nullptr) != nullptr);
+  2959	      undo::spaces->s_unlock();
+  2960	    }
+  2961	  } while (purge_sys->state == PURGE_STATE_RUN &&
+  2962	           (n_pages_purged > 0 || need_explicit_truncate) &&
+  2963	           !srv_purge_should_exit(n_pages_purged));
+  2964
+  2965	  return rseg_history_len;
+
+===== PostgreSQL 18.4 =====
+src/backend/access/heap/heapam_visibility.c:960:HeapTupleSatisfiesMVCC(HeapTuple htup, Snapshot snapshot,
+src/backend/access/heap/heapam_visibility.c:1165: * GetOldestNonRemovableTransactionId()).  Tuples deleted by XIDs >=
+src/backend/access/heap/vacuumlazy.c:1024:							 _("tuples: %" PRId64 " removed, %" PRId64 " remain, %" PRId64 " are dead but not yet removable\n"),
+src/backend/access/heap/vacuumlazy.c:2133:	 * GetOldestNonRemovableTransactionId() to move backwards, so it's not
+src/backend/access/heap/vacuumlazy.c:2136:	 * never moves backwards, but GetOldestNonRemovableTransactionId() is
+src/backend/access/heap/heapam_handler.c:1245:		OldestXmin = GetOldestNonRemovableTransactionId(heapRelation);
+src/backend/access/heap/heapam_handler.c:1287:	 * Must have called GetOldestNonRemovableTransactionId() if using
+src/backend/access/nbtree/nbtpage.c:3033:	GetOldestNonRemovableTransactionId(heaprel);
+src/backend/storage/ipc/procarray.c:108: * To avoid slowing down GetSnapshotData(), we don't calculate a precise
+src/backend/storage/ipc/procarray.c:162: * prevent maybe_needed to become old enough after the GetSnapshotData()
+src/backend/storage/ipc/procarray.c:389:	 * also created in various backends during GetSnapshotData(),
+src/backend/storage/ipc/procarray.c:941:	 * really committed yet. The reason for that is that GetSnapshotData()
+src/backend/storage/ipc/procarray.c:1681: * This is used by wrapper functions like GetOldestNonRemovableTransactionId()
+src/backend/storage/ipc/procarray.c:2005:GetOldestNonRemovableTransactionId(Relation rel)
+src/backend/storage/ipc/procarray.c:2030: * determinations (see GetOldestNonRemovableTransactionId()), but for
+src/backend/storage/ipc/procarray.c:2086: * Helper function for GetSnapshotData() that checks if the bulk of the
+src/backend/storage/ipc/procarray.c:2115:	 * GetSnapshotData() cannot change while ProcArrayLock is held. Snapshot
+src/backend/storage/ipc/procarray.c:2125:	 * requirement that concurrent GetSnapshotData() calls yield the same
+src/backend/storage/ipc/procarray.c:2175:GetSnapshotData(Snapshot snapshot)
+src/backend/storage/ipc/procarray.c:2682: * simple as possible and leave GetSnapshotData() as the primary code for
+src/backend/storage/ipc/procarray.c:2876: * simple as possible and leave GetSnapshotData() as the primary code for
+src/backend/storage/ipc/procarray.c:4357: * GetSnapshotData(), taking advantage of the fact that XidInMVCCSnapshot()
+src/backend/storage/lmgr/predicate.c:1820:		snapshot = GetSnapshotData(snapshot);
+src/backend/po/ru.po:41513:#~ "tuples: %.0f removed, %.0f remain, %.0f are dead but not yet removable\n"
+src/backend/po/zh_CN.po:901:msgid "tuples: %.0f removed, %.0f remain, %.0f are dead but not yet removable, oldest xmin: %u\n"
+src/backend/po/de.po:1478:msgid "tuples: %<PRId64> removed, %<PRId64> remain, %<PRId64> are dead but not yet removable\n"
+src/backend/po/pl.po:10536:#| msgid "tuples: %.0f removed, %.0f remain, %.0f are dead but not yet removable\n"
+src/backend/po/pl.po:10537:msgid "tuples: %.0f removed, %.0f remain, %.0f are dead but not yet removable, oldest xmin: %u\n"
+src/backend/po/ja.po:1273:msgid "tuples: %<PRId64> removed, %<PRId64> remain, %<PRId64> are dead but not yet removable\n"
+src/backend/po/ka.po:1266:msgid "tuples: %<PRId64> removed, %<PRId64> remain, %<PRId64> are dead but not yet removable\n"
+src/backend/po/es.po:1536:msgid "tuples: %<PRId64> removed, %<PRId64> remain, %<PRId64> are dead but not yet removable\n"
+src/backend/po/fr.po:1301:msgid "tuples: %lld removed, %lld remain, %lld are dead but not yet removable\n"
+src/backend/po/fr.po:32689:#~ "tuples: %.0f removed, %.0f remain, %.0f are dead but not yet removable\n"
+src/backend/po/uk.po:1469:msgid "tuples: %<PRId64> removed, %<PRId64> remain, %<PRId64> are dead but not yet removable\n"
+src/backend/po/pt_BR.po:1271:msgid "tuples: %lld removed, %lld remain, %lld are dead but not yet removable\n"
+src/backend/po/tr.po:830:msgid "tuples: %.0f removed, %.0f remain, %.0f are dead but not yet removable, oldest xmin: %u\n"
+src/backend/po/it.po:1062:msgid "tuples: %lld removed, %lld remain, %lld are dead but not yet removable\n"
+src/backend/po/sv.po:1494:msgid "tuples: %<PRId64> removed, %<PRId64> remain, %<PRId64> are dead but not yet removable\n"
+src/backend/utils/time/snapmgr.c:321:				CurrentSnapshot = GetSnapshotData(&CurrentSnapshotData);
+src/backend/utils/time/snapmgr.c:330:			CurrentSnapshot = GetSnapshotData(&CurrentSnapshotData);
+src/backend/utils/time/snapmgr.c:342:	CurrentSnapshot = GetSnapshotData(&CurrentSnapshotData);
+src/backend/utils/time/snapmgr.c:373:	SecondarySnapshot = GetSnapshotData(&SecondarySnapshotData);
+src/backend/utils/time/snapmgr.c:423:		CatalogSnapshot = GetSnapshotData(&CatalogSnapshotData);
+src/backend/utils/time/snapmgr.c:528:	CurrentSnapshot = GetSnapshotData(&CurrentSnapshotData);
+src/backend/commands/vacuum.c:1152:	cutoffs->OldestXmin = GetOldestNonRemovableTransactionId(rel);
+src/backend/commands/vacuum.c:1650:	 * GetOldestNonRemovableTransactionId(), which is a reasonable
+src/backend/commands/vacuum.c:1655:	newFrozenXid = GetOldestNonRemovableTransactionId(NULL);
+src/backend/commands/vacuum.c:2061:		 * MyProc->xid/xmin, otherwise GetOldestNonRemovableTransactionId()
+src/backend/commands/analyze.c:1224:	OldestXmin = GetOldestNonRemovableTransactionId(onerel);
+src/backend/replication/walsender.c:2686:	 * the xmin will be taken into account by GetSnapshotData() /
+   930		}
+   931
+   932		SetHintBits(tuple, buffer, HEAP_XMAX_COMMITTED,
+   933					HeapTupleHeaderGetRawXmax(tuple));
+   934		return false;				/* updated by other */
+   935	}
+   936
+   937	/*
+   938	 * HeapTupleSatisfiesMVCC
+   939	 *		True iff heap tuple is valid for the given MVCC snapshot.
+   940	 *
+   941	 * See SNAPSHOT_MVCC's definition for the intended behaviour.
+   942	 *
+   943	 * Notice that here, we will not update the tuple status hint bits if the
+   944	 * inserting/deleting transaction is still running according to our snapshot,
+   945	 * even if in reality it's committed or aborted by now.  This is intentional.
+   946	 * Checking the true transaction state would require access to high-traffic
+   947	 * shared data structures, creating contention we'd rather do without, and it
+   948	 * would not change the result of our visibility check anyway.  The hint bits
+   949	 * will be updated by the first visitor that has a snapshot new enough to see
+   950	 * the inserting/deleting transaction as done.  In the meantime, the cost of
+   951	 * leaving the hint bits unset is basically that each HeapTupleSatisfiesMVCC
+   952	 * call will need to run TransactionIdIsCurrentTransactionId in addition to
+   953	 * XidInMVCCSnapshot (but it would have to do the latter anyway).  In the old
+   954	 * coding where we tried to set the hint bits as soon as possible, we instead
+   955	 * did TransactionIdIsInProgress in each call --- to no avail, as long as the
+   956	 * inserting/deleting transaction was still running --- which was more cycles
+   957	 * and more contention on ProcArrayLock.
+   958	 */
+   959	static bool
+   960	HeapTupleSatisfiesMVCC(HeapTuple htup, Snapshot snapshot,
+   961						   Buffer buffer)
+   962	{
+   963		HeapTupleHeader tuple = htup->t_data;
+   964
+   965		/*
+   966		 * Assert that the caller has registered the snapshot.  This function
+   967		 * doesn't care about the registration as such, but in general you
+   968		 * shouldn't try to use a snapshot without registration because it might
+   969		 * get invalidated while it's still in use, and this is a convenient place
+   970		 * to check for that.
+   971		 */
+   972		Assert(snapshot->regd_count > 0 || snapshot->active_count > 0);
+   973
+   974		Assert(ItemPointerIsValid(&htup->t_self));
+   975		Assert(htup->t_tableOid != InvalidOid);
+   976
+   977		if (!HeapTupleHeaderXminCommitted(tuple))
+   978		{
+   979			if (HeapTupleHeaderXminInvalid(tuple))
+   980				return false;
+   981
+   982			/* Used by pre-9.0 binary upgrades */
+   983			if (tuple->t_infomask & HEAP_MOVED_OFF)
+   984			{
+   985				TransactionId xvac = HeapTupleHeaderGetXvac(tuple);
+   986
+   987				if (TransactionIdIsCurrentTransactionId(xvac))
+   988					return false;
+   989				if (!XidInMVCCSnapshot(xvac, snapshot))
+   990				{
+   991					if (TransactionIdDidCommit(xvac))
+   992					{
+   993						SetHintBits(tuple, buffer, HEAP_XMIN_INVALID,
+   994									InvalidTransactionId);
+   995						return false;
+   996					}
+   997					SetHintBits(tuple, buffer, HEAP_XMIN_COMMITTED,
+   998								InvalidTransactionId);
+   999				}
+  1000			}
+  1001			/* Used by pre-9.0 binary upgrades */
+  1002			else if (tuple->t_infomask & HEAP_MOVED_IN)
+  1003			{
+  1004				TransactionId xvac = HeapTupleHeaderGetXvac(tuple);
+  1005
+  1006				if (!TransactionIdIsCurrentTransactionId(xvac))
+  1007				{
+  1008					if (XidInMVCCSnapshot(xvac, snapshot))
+  1009						return false;
+  1010					if (TransactionIdDidCommit(xvac))
+  1011						SetHintBits(tuple, buffer, HEAP_XMIN_COMMITTED,
+  1012									InvalidTransactionId);
+  1013					else
+  1014					{
+  1015						SetHintBits(tuple, buffer, HEAP_XMIN_INVALID,
+  1016									InvalidTransactionId);
+  1017						return false;
+  1018					}
+  1019				}
+  1020			}
+  1021			else if (TransactionIdIsCurrentTransactionId(HeapTupleHeaderGetRawXmin(tuple)))
+  1022			{
+  1023				if (HeapTupleHeaderGetCmin(tuple) >= snapshot->curcid)
+  1024					return false;	/* inserted after scan started */
+  1025
+  1026				if (tuple->t_infomask & HEAP_XMAX_INVALID)	/* xid invalid */
+  1027					return true;
+  1028
+  1029				if (HEAP_XMAX_IS_LOCKED_ONLY(tuple->t_infomask))	/* not deleter */
+  1030					return true;
+  1031
+  1032				if (tuple->t_infomask & HEAP_XMAX_IS_MULTI)
+  1033				{
+  1034					TransactionId xmax;
+  1035
+  1036					xmax = HeapTupleGetUpdateXid(tuple);
+  1037
+  1038					/* not LOCKED_ONLY, so it has to have an xmax */
+  1039					Assert(TransactionIdIsValid(xmax));
+  1040
+  1041					/* updating subtransaction must have aborted */
+  1042					if (!TransactionIdIsCurrentTransactionId(xmax))
+  1043						return true;
+  1044					else if (HeapTupleHeaderGetCmax(tuple) >= snapshot->curcid)
+  1045						return true;	/* updated after scan started */
+  1046					else
+  1047						return false;	/* updated before scan started */
+  1048				}
+  1049
+  1050				if (!TransactionIdIsCurrentTransactionId(HeapTupleHeaderGetRawXmax(tuple)))
+  1051				{
+  1052					/* deleting subtransaction must have aborted */
+  1053					SetHintBits(tuple, buffer, HEAP_XMAX_INVALID,
+  1054								InvalidTransactionId);
+  1055					return true;
+  1056				}
+  1057
+  1058				if (HeapTupleHeaderGetCmax(tuple) >= snapshot->curcid)
+  1059					return true;	/* deleted after scan started */
+  1060				else
+  1061					return false;	/* deleted before scan started */
+  1062			}
+  1063			else if (XidInMVCCSnapshot(HeapTupleHeaderGetRawXmin(tuple), snapshot))
+  1064				return false;
+  1065			else if (TransactionIdDidCommit(HeapTupleHeaderGetRawXmin(tuple)))
+  1066				SetHintBits(tuple, buffer, HEAP_XMIN_COMMITTED,
+  1067							HeapTupleHeaderGetRawXmin(tuple));
+  1068			else
+  1069			{
+  1070				/* it must have aborted or crashed */
+  1071				SetHintBits(tuple, buffer, HEAP_XMIN_INVALID,
+  1072							InvalidTransactionId);
+  1073				return false;
+  1074			}
+  1075		}
+  1076		else
+  1077		{
+  1078			/* xmin is committed, but maybe not according to our snapshot */
+  1079			if (!HeapTupleHeaderXminFrozen(tuple) &&
+  1080				XidInMVCCSnapshot(HeapTupleHeaderGetRawXmin(tuple), snapshot))
+  1081				return false;		/* treat as still in progress */
+  1082		}
+  1083
+  1084		/* by here, the inserting transaction has committed */
+  1085
+  1086		if (tuple->t_infomask & HEAP_XMAX_INVALID)	/* xid invalid or aborted */
+  1087			return true;
+  1088
+  1089		if (HEAP_XMAX_IS_LOCKED_ONLY(tuple->t_infomask))
+  1090			return true;
+  1091
+  1092		if (tuple->t_infomask & HEAP_XMAX_IS_MULTI)
+  1093		{
+  1094			TransactionId xmax;
+  1095
+  1096			/* already checked above */
+  1097			Assert(!HEAP_XMAX_IS_LOCKED_ONLY(tuple->t_infomask));
+  1098
+  1099			xmax = HeapTupleGetUpdateXid(tuple);
+  1100
+  2143	 * GetSnapshotData -- returns information about running transactions.
+  2144	 *
+  2145	 * The returned snapshot includes xmin (lowest still-running xact ID),
+  2146	 * xmax (highest completed xact ID + 1), and a list of running xact IDs
+  2147	 * in the range xmin <= xid < xmax.  It is used as follows:
+  2148	 *		All xact IDs < xmin are considered finished.
+  2149	 *		All xact IDs >= xmax are considered still running.
+  2150	 *		For an xact ID xmin <= xid < xmax, consult list to see whether
+  2151	 *		it is considered running or not.
+  2152	 * This ensures that the set of transactions seen as "running" by the
+  2153	 * current xact will not change after it takes the snapshot.
+  2154	 *
+  2155	 * All running top-level XIDs are included in the snapshot, except for lazy
+  2156	 * VACUUM processes.  We also try to include running subtransaction XIDs,
+  2157	 * but since PGPROC has only a limited cache area for subxact XIDs, full
+  2158	 * information may not be available.  If we find any overflowed subxid arrays,
+  2159	 * we have to mark the snapshot's subxid data as overflowed, and extra work
+  2160	 * *may* need to be done to determine what's running (see XidInMVCCSnapshot()).
+  2161	 *
+  2162	 * We also update the following backend-global variables:
+  2163	 *		TransactionXmin: the oldest xmin of any snapshot in use in the
+  2164	 *			current transaction (this is the same as MyProc->xmin).
+  2165	 *		RecentXmin: the xmin computed for the most recent snapshot.  XIDs
+  2166	 *			older than this are known not running any more.
+  2167	 *
+  2168	 * And try to advance the bounds of GlobalVis{Shared,Catalog,Data,Temp}Rels
+  2169	 * for the benefit of the GlobalVisTest* family of functions.
+  2170	 *
+  2171	 * Note: this function should probably not be called with an argument that's
+  2172	 * not statically allocated (see xip allocation below).
+  2173	 */
+  2174	Snapshot
+  2175	GetSnapshotData(Snapshot snapshot)
+  2176	{
+  2177		ProcArrayStruct *arrayP = procArray;
+  2178		TransactionId *other_xids = ProcGlobal->xids;
+  2179		TransactionId xmin;
+  2180		TransactionId xmax;
+  2181		int			count = 0;
+  2182		int			subcount = 0;
+  2183		bool		suboverflowed = false;
+  2184		FullTransactionId latest_completed;
+  2185		TransactionId oldestxid;
+  2186		int			mypgxactoff;
+  2187		TransactionId myxid;
+  2188		uint64		curXactCompletionCount;
+  2189
+  2190		TransactionId replication_slot_xmin = InvalidTransactionId;
+  2191		TransactionId replication_slot_catalog_xmin = InvalidTransactionId;
+  2192
+  2193		Assert(snapshot != NULL);
+  2194
+  2195		/*
+  2196		 * Allocating space for maxProcs xids is usually overkill; numProcs would
+  2197		 * be sufficient.  But it seems better to do the malloc while not holding
+  2198		 * the lock, so we can't look at numProcs.  Likewise, we allocate much
+  2199		 * more subxip storage than is probably needed.
+  2200		 *
+  2201		 * This does open a possibility for avoiding repeated malloc/free: since
+  2202		 * maxProcs does not change at runtime, we can simply reuse the previous
+  2203		 * xip arrays if any.  (This relies on the fact that all callers pass
+  2204		 * static SnapshotData structs.)
+  2205		 */
+  2206		if (snapshot->xip == NULL)
+  2207		{
+  2208			/*
+  2209			 * First call for this snapshot. Snapshot is same size whether or not
+  2210			 * we are in recovery, see later comments.
+  2211			 */
+  2212			snapshot->xip = (TransactionId *)
+  2213				malloc(GetMaxSnapshotXidCount() * sizeof(TransactionId));
+  2214			if (snapshot->xip == NULL)
+  2215				ereport(ERROR,
+  2216						(errcode(ERRCODE_OUT_OF_MEMORY),
+  2217						 errmsg("out of memory")));
+  2218			Assert(snapshot->subxip == NULL);
+  2219			snapshot->subxip = (TransactionId *)
+  2220				malloc(GetMaxSnapshotSubxidCount() * sizeof(TransactionId));
+  2221			if (snapshot->subxip == NULL)
+  2222				ereport(ERROR,
+  2223						(errcode(ERRCODE_OUT_OF_MEMORY),
+  2224						 errmsg("out of memory")));
+  2225		}
+  2226
+  2227		/*
+  2228		 * It is sufficient to get shared lock on ProcArrayLock, even if we are
+  2229		 * going to set MyProc->xmin.
+  2230		 */
+  2231		LWLockAcquire(ProcArrayLock, LW_SHARED);
+  2232
+  2233		if (GetSnapshotDataReuse(snapshot))
+  2234		{
+  2235			LWLockRelease(ProcArrayLock);
+  2236			return snapshot;
+  2237		}
+  2238
+  2239		latest_completed = TransamVariables->latestCompletedXid;
+  2240		mypgxactoff = MyProc->pgxactoff;
+  2241		myxid = other_xids[mypgxactoff];
+  2242		Assert(myxid == MyProc->xid);
+  2243
+  2244		oldestxid = TransamVariables->oldestXid;
+  2245		curXactCompletionCount = TransamVariables->xactCompletionCount;
+  2246
+  2247		/* xmax is always latestCompletedXid + 1 */
+  2248		xmax = XidFromFullTransactionId(latest_completed);
+  2249		TransactionIdAdvance(xmax);
+  2250		Assert(TransactionIdIsNormal(xmax));
+  2251
+  2252		/* initialize xmin calculation with xmax */
+  2253		xmin = xmax;
+  2254
+  2255		/* take own xid into account, saves a check inside the loop */
+  1010				appendStringInfo(&buf, msgfmt,
+  1011								 vacrel->dbname,
+  1012								 vacrel->relnamespace,
+  1013								 vacrel->relname,
+  1014								 vacrel->num_index_scans);
+  1015				appendStringInfo(&buf, _("pages: %u removed, %u remain, %u scanned (%.2f%% of total), %u eagerly scanned\n"),
+  1016								 vacrel->removed_pages,
+  1017								 new_rel_pages,
+  1018								 vacrel->scanned_pages,
+  1019								 orig_rel_pages == 0 ? 100.0 :
+  1020								 100.0 * vacrel->scanned_pages /
+  1021								 orig_rel_pages,
+  1022								 vacrel->eager_scanned_pages);
+  1023				appendStringInfo(&buf,
+  1024								 _("tuples: %" PRId64 " removed, %" PRId64 " remain, %" PRId64 " are dead but not yet removable\n"),
+  1025								 vacrel->tuples_deleted,
+  1026								 (int64) vacrel->new_rel_tuples,
+  1027								 vacrel->recently_dead_tuples);
+  1028				if (vacrel->missed_dead_tuples > 0)
+  1029					appendStringInfo(&buf,
+  1030									 _("tuples missed: %" PRId64 " dead from %u pages not removed due to cleanup lock contention\n"),
+  1031									 vacrel->missed_dead_tuples,
+  1032									 vacrel->missed_dead_pages);
+  1033				diff = (int32) (ReadNextTransactionId() -
+  1034								vacrel->cutoffs.OldestXmin);
+  1035				appendStringInfo(&buf,
+  1036								 _("removable cutoff: %u, which was %d XIDs old when operation ended\n"),
+  1037								 vacrel->cutoffs.OldestXmin, diff);
+  1038				if (frozenxid_updated)
+  1039				{
+  1040					diff = (int32) (vacrel->NewRelfrozenXid -
+  1041									vacrel->cutoffs.relfrozenxid);
+  1042					appendStringInfo(&buf,
+  1043									 _("new relfrozenxid: %u, which is %d XIDs ahead of previous value\n"),
+  1044									 vacrel->NewRelfrozenXid, diff);
+  1045				}
+  2320				/*
+  2321				 * Non-aggressive VACUUMs are under no obligation to advance
+  2322				 * relfrozenxid (even by one XID).  We can be much laxer here.
+  2323				 *
+  2324				 * Currently we always just accept an older final relfrozenxid
+  2325				 * and/or relminmxid value.  We never make caller wait or work a
+  2326				 * little harder, even when it likely makes sense to do so.
+  2327				 */
+  2328			}
+  2329
+  2330			ItemPointerSet(&(tuple.t_self), blkno, offnum);
+  2331			tuple.t_data = (HeapTupleHeader) PageGetItem(page, itemid);
+  2332			tuple.t_len = ItemIdGetLength(itemid);
+  2333			tuple.t_tableOid = RelationGetRelid(vacrel->rel);
+  2334
+  2335			switch (HeapTupleSatisfiesVacuum(&tuple, vacrel->cutoffs.OldestXmin,
+  2336											 buf))
+  2337			{
+  2338				case HEAPTUPLE_DELETE_IN_PROGRESS:
+  2339				case HEAPTUPLE_LIVE:
+  2340
+  2341					/*
+  2342					 * Count both cases as live, just like lazy_scan_prune
+  2343					 */
+  2344					live_tuples++;
+  2345
+  2346					break;
+  2347				case HEAPTUPLE_DEAD:
+  2348
+  2349					/*
+  2350					 * There is some useful work for pruning to do, that won't be
+  2351					 * done due to failure to get a cleanup lock.
+  2352					 */
+  2353					missed_dead_tuples++;
+  2354					break;
+  2355				case HEAPTUPLE_RECENTLY_DEAD:
+  2356
+  2357					/*
+  2358					 * Count in recently_dead_tuples, just like lazy_scan_prune
+  2359					 */
+  2360					recently_dead_tuples++;

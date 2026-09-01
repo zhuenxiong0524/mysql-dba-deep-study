@@ -1,0 +1,94 @@
+DROP DATABASE
+CREATE DATABASE
+CREATE TABLE
+INSERT 0 30000
+CREATE INDEX
+CREATE INDEX
+VACUUM
+A. environment and row count
+                                              version
+---------------------------------------------------------------------------------------------------
+ PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+(1 row)
+
+ block_size | rows_count | min_id | max_id
+------------+------------+--------+--------
+ 8192       |      30000 |      1 |  30000
+(1 row)
+
+B. PostgreSQL is heap + independent indexes
+   relname    | relkind | relfilenode |  bytes
+--------------+---------+-------------+---------
+ idx_cover    | i       |       93338 | 1228800
+ idx_lab_pkey | i       |       93335 | 1220608
+ idx_tenant   | i       |       93337 |  221184
+ idx_lab      | r       |       93327 | 4472832
+(4 rows)
+
+  indexname   |                                             indexdef
+--------------+---------------------------------------------------------------------------------------------------
+ idx_cover    | CREATE INDEX idx_cover ON public.idx_lab USING btree (tenant_id, status) INCLUDE (id, created_at)
+ idx_lab_pkey | CREATE UNIQUE INDEX idx_lab_pkey ON public.idx_lab USING btree (id)
+ idx_tenant   | CREATE INDEX idx_tenant ON public.idx_lab USING btree (tenant_id)
+(3 rows)
+
+C. heap physical order follows descending insertion, not primary key
+ ctid  |  id   | tenant_id
+-------+-------+-----------
+ (0,1) | 30000 |         0
+ (0,2) | 29999 |        99
+ (0,3) | 29998 |        98
+ (0,4) | 29997 |        97
+ (0,5) | 29996 |        96
+(5 rows)
+
+D. primary-key B-tree lookup still fetches heap tuple
+SET
+SET
+                                          QUERY PLAN
+----------------------------------------------------------------------------------------------
+ Index Scan using idx_lab_pkey on public.idx_lab (actual time=0.039..0.040 rows=1.00 loops=1)
+   Output: payload
+   Index Cond: (idx_lab.id = 42)
+   Index Searches: 1
+   Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=8
+ Planning Time: 0.161 ms
+ Execution Time: 0.063 ms
+(9 rows)
+
+E1. secondary index query needs payload: Index Scan then heap fetch
+                                          QUERY PLAN
+----------------------------------------------------------------------------------------------
+ Index Scan using idx_tenant on public.idx_lab (actual time=0.069..0.704 rows=300.00 loops=1)
+   Output: payload
+   Index Cond: (idx_lab.tenant_id = 42)
+   Index Searches: 1
+   Buffers: shared hit=300 read=2
+ Planning:
+   Buffers: shared hit=5
+ Planning Time: 0.115 ms
+ Execution Time: 0.752 ms
+(9 rows)
+
+E2. same predicate/projection: INCLUDE enables Index Only Scan
+                                            QUERY PLAN
+--------------------------------------------------------------------------------------------------
+ Index Only Scan using idx_cover on public.idx_lab (actual time=0.134..0.307 rows=300.00 loops=1)
+   Output: id, tenant_id, status, created_at
+   Index Cond: ((idx_lab.tenant_id = 42) AND (idx_lab.status = 2))
+   Heap Fetches: 0
+   Index Searches: 1
+   Buffers: shared hit=4 read=3
+ Planning:
+   Buffers: shared hit=11
+ Planning Time: 0.207 ms
+ Execution Time: 0.361 ms
+(10 rows)
+
+F. visibility map is part of PG index-only semantics
+ relpages | relallvisible | all_heap_pages_visible
+----------+---------------+------------------------
+      546 |           546 | t
+(1 row)

@@ -1,0 +1,387 @@
+MVCC-001 PostgreSQL 18.4 real output (2026-09-01)
+
+===== setup =====
+DROP DATABASE
+CREATE DATABASE
+CREATE TABLE
+INSERT 0 1
+                                              version
+---------------------------------------------------------------------------------------------------
+ PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+(1 row)
+
+ default_transaction_isolation
+-------------------------------
+ read committed
+(1 row)
+
+ xmin | xmax | ctid  | id | version_no | payload
+------+------+-------+----+------------+---------
+ 1354 | 0    | (0,1) |  1 |          0 | v0
+(1 row)
+
+
+===== T1 opens RR snapshot and reads v0 =====
+\pset pager off
+Pager usage is off.
+pg_mvcc001=> BEGIN ISOLATION LEVEL REPEATABLE READ;
+BEGIN
+pg_mvcc001=*> <act_id() AS xid, pg_current_snapshot() AS snapshot;
+  pid  | xid  |  snapshot
+-------+------+------------
+ 44770 | 1355 | 1355:1355:
+(1 row)
+
+pg_mvcc001=*> <tid,id,version_no,payload FROM mvcc_lab WHERE id=1;
+ xmin | xmax | ctid  | id | version_no | payload
+------+------+-------+----+------------+---------
+ 1354 | 0    | (0,1) |  1 |          0 | v0
+(1 row)
+
+pg_mvcc001=*>
+===== T2 commits 201 updates =====
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+ xmin | xmax |  ctid  | id | version_no | payload
+------+------+--------+----+------------+---------
+ 1556 | 0    | (1,17) |  1 |        201 | v201
+(1 row)
+
+
+===== T1 rereads old version =====
+SELECT 'T1 after 201 committed updates' AS phase;
+             phase
+--------------------------------
+ T1 after 201 committed updates
+(1 row)
+
+pg_mvcc001=*> <tid,id,version_no,payload FROM mvcc_lab WHERE id=1;
+ xmin | xmax | ctid  | id | version_no | payload
+------+------+-------+----+------------+---------
+ 1354 | 1356 | (0,1) |  1 |          0 | v0
+(1 row)
+
+pg_mvcc001=*>
+===== fresh session + pg_stat_activity =====
+     phase     | xmin | xmax |  ctid  | id | version_no | payload
+---------------+------+------+--------+----+------------+---------
+ fresh session | 1556 | 0    | (1,17) |  1 |        201 | v201
+(1 row)
+
+  pid  |        state        |          xact_start           | backend_xid | backend_xmin |                                      query
+-------+---------------------+-------------------------------+-------------+--------------+----------------------------------------------------------------------------------
+ 44770 | idle in transaction | 2026-09-01 15:23:51.71105+08  |        1355 |         1355 | SELECT xmin::text,xmax::text,ctid,id,version_no,payload FROM mvcc_lab WHERE id=1
+ 44857 | active              | 2026-09-01 15:24:20.966572+08 |             |         1355 | SELECT 'fresh session' phase,xmin::text,xmax::text,ctid,id,version_no,payload FR
+(2 rows)
+
+SET
+ n_live_tup | n_dead_tup | vacuum_count | last_vacuum
+------------+------------+--------------+-------------
+          1 |        201 |            0 |
+(1 row)
+
+ERROR:  VACUUM cannot run inside a transaction block
+
+===== VACUUM while T1 snapshot is open =====
+INFO:  vacuuming "pg_mvcc001.public.mvcc_lab"
+INFO:  finished vacuuming "pg_mvcc001.public.mvcc_lab": index scans: 0
+pages: 0 removed, 2 remain, 2 scanned (100.00% of total), 0 eagerly scanned
+tuples: 0 removed, 202 remain, 201 are dead but not yet removable
+removable cutoff: 1355, which was 202 XIDs old when operation ended
+new relfrozenxid: 1354, which is 1 XIDs ahead of previous value
+frozen: 0 pages from table (0.00% of total) had 0 tuples frozen
+visibility map: 0 pages set all-visible, 0 pages set all-frozen (0 were all-visible)
+index scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed
+avg read rate: 0.000 MB/s, avg write rate: 33.918 MB/s
+buffer usage: 54 hits, 0 reads, 3 dirtied
+WAL usage: 4 records, 3 full page images, 24981 bytes, 0 buffers full
+system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+INFO:  analyzing "public.mvcc_lab"
+INFO:  "mvcc_lab": scanned 2 of 2 pages, containing 1 live rows and 201 dead rows; 1 rows in sample, 1 estimated total rows
+INFO:  finished analyzing table "pg_mvcc001.public.mvcc_lab"
+avg read rate: 0.000 MB/s, avg write rate: 0.000 MB/s
+buffer usage: 208 hits, 0 reads, 0 dirtied
+WAL usage: 7 records, 0 full page images, 855 bytes, 0 buffers full
+system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+VACUUM
+ n_live_tup | n_dead_tup | vacuum_count |          last_vacuum
+------------+------------+--------------+-------------------------------
+          1 |        201 |            1 | 2026-09-01 15:24:28.298051+08
+(1 row)
+
+
+===== T1 commit and sees current version =====
+COMMIT;
+COMMIT
+pg_mvcc001=> <max::text,ctid,id,version_no,payload FROM mvcc_lab;
+      phase      | xmin | xmax |  ctid  | id | version_no | payload
+-----------------+------+------+--------+----+------------+---------
+ T1 after commit | 1556 | 0    | (1,17) |  1 |        201 | v201
+(1 row)
+
+pg_mvcc001=> \q
+
+===== VACUUM after snapshot release =====
+INFO:  vacuuming "pg_mvcc001.public.mvcc_lab"
+INFO:  finished vacuuming "pg_mvcc001.public.mvcc_lab": index scans: 1
+pages: 0 removed, 2 remain, 2 scanned (100.00% of total), 0 eagerly scanned
+tuples: 16 removed, 1 remain, 0 are dead but not yet removable
+removable cutoff: 1558, which was 0 XIDs old when operation ended
+new relfrozenxid: 1556, which is 202 XIDs ahead of previous value
+frozen: 0 pages from table (0.00% of total) had 0 tuples frozen
+visibility map: 2 pages set all-visible, 1 pages set all-frozen (0 were all-visible)
+index scan needed: 1 pages from table (50.00% of total) had 1 dead item identifiers removed
+index "mvcc_lab_pkey": pages: 2 in total, 0 newly deleted, 0 currently deleted, 0 reusable
+avg read rate: 0.000 MB/s, avg write rate: 4.505 MB/s
+buffer usage: 62 hits, 0 reads, 1 dirtied
+WAL usage: 6 records, 1 full page images, 8767 bytes, 0 buffers full
+system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+INFO:  analyzing "public.mvcc_lab"
+INFO:  "mvcc_lab": scanned 2 of 2 pages, containing 1 live rows and 0 dead rows; 1 rows in sample, 1 estimated total rows
+INFO:  finished analyzing table "pg_mvcc001.public.mvcc_lab"
+avg read rate: 0.000 MB/s, avg write rate: 0.000 MB/s
+buffer usage: 198 hits, 0 reads, 0 dirtied
+WAL usage: 3 records, 0 full page images, 228 bytes, 0 buffers full
+system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+VACUUM
+ n_live_tup | n_dead_tup | vacuum_count |          last_vacuum
+------------+------------+--------------+-------------------------------
+          1 |          0 |            2 | 2026-09-01 15:24:44.484948+08
+(1 row)
+
+
+===== RC first SELECT =====
+\pset pager off
+Pager usage is off.
+pg_mvcc001=> BEGIN ISOLATION LEVEL READ COMMITTED;
+BEGIN
+pg_mvcc001=*> SHOW transaction_isolation;
+ transaction_isolation
+-----------------------
+ read committed
+(1 row)
+
+pg_mvcc001=*> <max::text,ctid,id,version_no,payload FROM mvcc_lab;
+ xmin | xmax |  ctid  | id | version_no | payload
+------+------+--------+----+------------+---------
+ 1556 | 0    | (1,17) |  1 |        201 | v201
+(1 row)
+
+pg_mvcc001=*>
+===== concurrent update to v202 =====
+UPDATE 1
+ xmin | xmax | ctid  | id | version_no | payload
+------+------+-------+----+------------+---------
+ 1559 | 0    | (1,2) |  1 |        202 | v202
+(1 row)
+
+
+===== same RC transaction second SELECT =====
+<max::text,ctid,id,version_no,payload FROM mvcc_lab;
+               phase               | xmin | xmax | ctid  | id | version_no | payload
+-----------------------------------+------+------+-------+----+------------+---------
+ same RC transaction second SELECT | 1559 | 0    | (1,2) |  1 |        202 | v202
+(1 row)
+
+pg_mvcc001=*> COMMIT;
+COMMIT
+pg_mvcc001=> \q

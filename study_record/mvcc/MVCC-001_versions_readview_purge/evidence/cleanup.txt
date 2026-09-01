@@ -1,0 +1,5 @@
+MVCC-001 environment cleanup (2026-09-01)
+
+MySQL: DROP DATABASE IF EXISTS mysql_mvcc001; -> database absent after cleanup.
+PostgreSQL: DROP DATABASE IF EXISTS pg_mvcc001; -> DROP DATABASE; database absent after cleanup.
+IDX-001 experiment databases mysql_idx001 / pg_idx001 were also confirmed absent.

@@ -138,6 +138,46 @@ SELECT VARIABLE_NAME, VARIABLE_SOURCE, VARIABLE_PATH, SET_TIME, SET_USER
   FROM performance_schema.variables_info WHERE VARIABLE_NAME='max_connections';
 ```
 
+## 索引是否回表 / 是否覆盖？（IDX-001 实测）
+
+```sql
+SHOW INDEX FROM db_name.table_name;
+EXPLAIN SELECT ...;          -- Extra=Using index：投影被覆盖
+EXPLAIN ANALYZE SELECT ...;  -- TREE 中 Covering index lookup：覆盖
+```
+
+判断规则：
+
+- `Index lookup ... using secondary_index` 且没有 `Using index`：二级索引命中后通常按主键回聚簇索引。
+- `Using index` 是覆盖索引；`Using index condition` 是 ICP，二者不是一回事，ICP 仍可能回表。
+- InnoDB 二级索引自动携带 PRIMARY KEY；不要为了“覆盖主键”重复把主键列写进索引。
+- 主键会进入每个二级索引：优先短、稳定、尽量单调的键；宽/随机 UUID 会放大空间与随机写。
+- 无显式主键会生成隐藏 `GEN_CLUST_INDEX`；生产表应显式设计可用主键。
+
+PG 对照：`Index Scan` 按 TID 回 heap；`Index Only Scan` 还要看 `Heap Fetches`，不为 0 时仍访问 heap。
+
+## 长事务是否拖住 Undo/Purge？（MVCC-001 实测）
+
+```sql
+SELECT trx_mysql_thread_id,trx_id,trx_state,trx_started,
+       trx_isolation_level,trx_rows_modified,trx_query
+FROM information_schema.innodb_trx ORDER BY trx_started;
+
+SHOW ENGINE INNODB STATUS\G
+-- TRANSACTIONS 段重点看：Purge done for... / History list length
+SHOW FULL PROCESSLIST;  -- 按 trx_mysql_thread_id 找用户、来源和 SQL（P_S=OFF 兜底）
+```
+
+判断与处置：
+
+- HLL 是实例级 undo log header 数，不是行版本数或字节数；看持续增长趋势。
+- `trx_rows_modified=0` 的只读长事务也可能持有旧 ReadView，不能只筛写事务。
+- 先确认业务影响，再结束/提交根因事务；随后持续观察 HLL，Purge 异步执行，不会保证瞬间归零。
+- 不要手工删除 `undo_001/undo_002`，也不要把重启当作清理手段。
+
+PG 对照：查 `pg_stat_activity.xact_start/backend_xmin` 与 `pg_stat_user_tables.n_dead_tup`；
+旧 backend_xmin 会令 VACUUM 报 `dead but not yet removable`。
+
 ## 待填充（随专题扩展）
 
 - 长事务/锁等待/deadlock → ISO-001/MON-001

@@ -20,12 +20,15 @@
 | WITH GRANT OPTION | WITH GRANT OPTION | ✅ | 均只能转授持有且不超 scope 的权限 | ENV-004 |
 | Role Membership INHERIT | GRANT role TO user + 激活 | ❌ | PG 默认继承生效；MySQL 默认不激活（CURRENT_ROLE()=NONE） | ENV-004 |
 | shared_buffers | innodb_buffer_pool_size | 🔶 | 均缓存数据页；MySQL 还有 log buffer/双写/自适应哈希 | BUF-001 |
-| Heap table | Clustered Index（主键即数据） | ❌ | 二级索引携带主键回表，PG 索引存 TID 回堆 | IDX-001 |
+| Heap table + 独立 B-tree（主键也存 TID） | Clustered Index（PRIMARY 叶子即整行） | ❌ | PG Index Scan 按 TID 回 heap；InnoDB 二级索引自动携带聚簇键，缺列时回 PRIMARY | IDX-001 |
+| Index Only Scan + INCLUDE + visibility map | Covering index (`Using index`) | 🔶 | PG 即使 Index Only 也可能 Heap Fetch；InnoDB 投影覆盖通常免常规回表，但 MVCC 可见性不足时仍可能访问聚簇记录 | IDX-001 |
+| 无 PRIMARY KEY 的 heap 表 | 隐藏 `GEN_CLUST_INDEX` + `DB_ROW_ID` | ❌ | PG 仍是普通 heap；InnoDB 永远需要聚簇索引，隐藏键不可供业务稳定引用 | IDX-001 |
 | WAL | InnoDB Redo + Binlog | ❌ | 双日志体系：redo 崩溃恢复 / binlog 复制+PITR | REDO-001/LOG-001 |
 | 表文件（base/<oid>/<relfilenode>） | 库名/表.ibd（file-per-table） | 🔶 | PG 文件是裸数字 relfilenode；MySQL 文件名一眼可读；8.4 字典在 mysql.ibd、ibdata1 不再膨胀 | ENG-002 |
 | VACUUM (FULL) / TRUNCATE | OPTIMIZE TABLE / TRUNCATE TABLE | 🔶 | 都重写/换文件；PG VACUUM FULL=CLUSTER 变体，MySQL OPTIMIZE=ALTER 重建；TRUNCATE 都回到初始文件 | ENG-002 |
-| VACUUM / autovacuum | Purge 线程 + history list | ❌ | PG 原地清理旧版本；InnoDB undo 链 + 后台 purge | MVCC-001 |
-| Tuple 版本链（xmin/xmax） | undo log + roll_ptr 版本链 | 🔶 | 机制类似（多版本），实现和清理完全不同 | MVCC-001 |
+| VACUUM / autovacuum + OldestXmin | Purge 线程 + oldest ReadView + History List Length | ❌ | 长快照都拖住清理；PG 留 dead heap tuples，InnoDB 留 update undo/history | MVCC-001 |
+| Heap tuple 版本链（xmin/xmax/ctid） | 聚簇记录 DB_TRX_ID/DB_ROLL_PTR + update undo 链 | 🔶 | PG 新旧完整 tuple 在 heap；InnoDB 当前记录在 PRIMARY、旧值由 undo 重建 | MVCC-001 |
+| Snapshot xmin/xmax/xip | ReadView up/low limit + m_ids | 🔶 | 都按事务 ID 边界与活跃集合判可见；PG 默认 RC 每语句快照，MySQL 默认 RR 复用 ReadView | MVCC-001 |
 | pg_locks | performance_schema.data_locks（或 innodb_status） | 🔶 | PG 系统表实时；MySQL P_S 表（本机 OFF，需另开） | ISO-001 |
 | pg_stat_activity | SHOW PROCESSLIST / P_S.threads | 🔶 | 本机 P_S=OFF，用 PROCESSLIST + status 计数兜底 | MON-001 |
 | pg_stat_statements | P_S.events_statements_summary / slow log | 🔶 | 本机 P_S=OFF，用 slow log + performance_schema 需启用 | MON-001 |
