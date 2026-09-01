@@ -88,6 +88,10 @@ SET PERSIST max_connections=105;              -- 在线生效 + 写 auto.cnf，�
 SET PERSIST_ONLY innodb_buffer_pool_size=...; -- 只写文件，下次重启生效
 RESET PERSIST max_connections;                -- 从 auto.cnf 删除
 -- 静态参数 SET GLOBAL → ERROR 1238 (HY000) read only variable → 需重启
+
+-- 参数来源判定（P_S=OFF 也可查）：VARIABLE_SOURCE=COMPILED/GLOBAL/COMMAND_LINE/DYNAMIC/PERSISTED
+SELECT VARIABLE_NAME, VARIABLE_SOURCE, VARIABLE_PATH, SET_TIME, SET_USER
+  FROM performance_schema.variables_info WHERE VARIABLE_NAME='max_connections';
 ```
 
 ## 待填充（随专题扩展）

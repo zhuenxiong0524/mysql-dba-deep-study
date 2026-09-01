@@ -1,0 +1,48 @@
+===== ENV-006 理解验证自测（2026-09-01）=====
+覆盖：读三式 / SESSION 不回显 / 动态 GLOBAL / 静态 1238 / SET PERSIST / server_id 动态 / 还原校验
+
+--- 1. 读参数三式（@@ 默认 SESSION 视角）---
+g_max=100  s_iso=REPEATABLE-READ  cur_max=100
+--- 2. SESSION 级修改（只影响本会话）---
+SET SESSION transaction_isolation='READ-COMMITTED'
+sess_iso=READ-COMMITTED  glob_iso=REPEATABLE-READ
+--- 3. 动态 GLOBAL（在线生效，重启丢失）---
+SET GLOBAL max_connections=101  →  @@GLOBAL.max_connections=101
+--- 4. 静态参数 SET GLOBAL 报 1238（需重启）---
+SET GLOBAL port=3307  →  ERROR 1238 (HY000): Variable 'port' is a read only variable
+--- 5. SET PERSIST 在线生效 + 写 mysqld-auto.cnf ---
+SET PERSIST max_connections=101  →  @@GLOBAL=101；mysqld-auto.cnf 出现 max_connections=101
+--- 6. server_id 8.0+ 动态确认 ---
+SET GLOBAL server_id=2  →  @@GLOBAL.server_id=2；SET GLOBAL server_id=1 还原
+--- 7. 还原 PERSIST 残留 ---
+RESET PERSIST IF EXISTS max_connections; SET GLOBAL max_connections=100
+--- 8. 终态校验（全部还原）---
+max_conn=100  server_id=1  port=3306  iso=REPEATABLE-READ；mysqld-auto.cnf={"Version": 2}
+--- 附加 A. GLOBAL-only 变量无 SESSION 版 ---
+@@SESSION.max_connections → ERROR 1238: Variable 'max_connections' is a GLOBAL variable
+
+===== 结论修正：P_S=OFF 时 variables_info 仍可用（2026-09-01 实测，推翻 08-28 旧结论）=====
+--- information_schema.global_variables 在 8.4 已移除 ---
+SELECT ... FROM information_schema.global_variables → ERROR 1109: Unknown table 'GLOBAL_VARIABLES' in information_schema
+--- performance_schema 状态 ---
+@@GLOBAL.performance_schema=OFF（0）
+performance_schema.global_variables → 623 行（可用！）
+performance_schema.variables_info   → 647 行（可用！）
+
+--- variables_info 来源判定实测（P_S=OFF）---
+VARIABLE_NAME            | VARIABLE_VALUE | VARIABLE_SOURCE | VARIABLE_PATH
+innodb_buffer_pool_size  | 67108864       | GLOBAL          | /etc/my.cnf
+performance_schema       | OFF            | GLOBAL          | /etc/my.cnf
+port                     | 3306           | COMMAND_LINE    |
+log_bin                  | ON             | COMPILED        |
+max_connections          | 100            | DYNAMIC         |  (SET_TIME=2026-09-01 09:51:46, root@localhost —— 自测 SET GLOBAL 的痕迹)
+server_id                | 1              | DYNAMIC         |  (SET_TIME=2026-09-01 09:51:46, root@localhost)
+
+结论：
+1. P_S=OFF 禁用的是 instrumentation 表（events_*/threads 等）；global_variables/session_variables/variables_info
+   是 setup 元数据表，即使 P_S=OFF 也可查询。
+2. variables_info.VARIABLE_SOURCE/VARIABLE_PATH/SET_TIME/SET_USER 就是 MySQL 的"参数来源"答案：
+   COMPILED=编译默认 / GLOBAL=配置文件 / COMMAND_LINE=命令行 / DYNAMIC=运行期被 SET 改过 / PERSISTED=SET PERSIST。
+3. 因此"来源判定"第一选择是 performance_schema.variables_info，my_print_defaults 兜底，无需依赖 P_S=ON。
+4. 旧 evidence（08-28 认为 variables_info 不可用、来源只能靠 my_print_defaults+auto.cnf）不准确，已修正。
+5. 对 MON-001 的意义：参数来源/变量视图不受 P_S=OFF 限制；慢日志与事件类统计仍受限。

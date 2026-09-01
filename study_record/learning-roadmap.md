@@ -45,7 +45,7 @@
 - 实验：ps/ss/systemctl（本机无 systemd 单元）、@@datadir/@@basedir/@@pid_file/@@log_error、error log 启动日志、P_S=OFF 现状
 - 交付：环境基线 + 实例生命周期文章 + "实例挂了先看哪" 路径
 
-### ENV-006 配置文件与参数体系（M，P0，生产向，进行中 2026-08-28）
+### ENV-006 配置文件与参数体系（M，P0，生产向，✅ 已完成 2026-09-01）
 - PG：postgresql.conf / ALTER SYSTEM / pg_settings / reload vs restart
 - MySQL：my.cnf 搜索路径、mysqld --verbose --help、GLOBAL/SESSION/PERSIST/PERSIST_ONLY、动态 vs 需重启参数
 - 实验：改参数三张表（在线/仅新连接/需重启）+ SET PERSIST 重启验证
@@ -211,7 +211,7 @@
 | 顺序 | 专题 | 任务 ID | 状态 |
 |---|---|---|---|
 | 1 | 实例架构与生命周期 | ENV-005 | 进行中 2026-08-28 |
-| 2 | 配置文件与参数体系 | ENV-006 | 进行中 2026-08-28 |
+| 2 | 配置文件与参数体系 | ENV-006 | ✅ 已完成 2026-09-01 |
 | 3 | 登录与认证 | ENV-007 | 未开始 |
 | 4 | 账号与权限体系 | ENV-004 | ✅ 已完成 |
 

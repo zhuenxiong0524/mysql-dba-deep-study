@@ -1,6 +1,7 @@
 # MySQL 配置文件与参数体系：从 postgresql.conf 与 ALTER SYSTEM 迁移
 
-> 版本：v1.0（2026-08-28，实机验证于 1C/2G 学习机；含一次受控重启验证）
+> 版本：v1.1（2026-09-01：理解验证自测 + 修正"P_S=OFF 时 variables_info 不可用"的旧结论——实测 setup 表仍可查）
+> v1.0（2026-08-28，实机验证于 1C/2G 学习机；含一次受控重启验证）
 > 基线：PostgreSQL 18.4（端口 54184）→ 目标：MySQL 8.4.10 LTS（端口 3306）
 > 系列：PG DBA → MySQL 生产 DBA 迁移项目 · 第一阶段专题 2（ENV-006）
 > 证据：`evidence/pg-config.txt`、`evidence/mysql-config.txt`
@@ -118,7 +119,7 @@ my_print_defaults mysqld（配置链合成后的有效参数）：
 |---|---|---|
 | 主配置 | postgresql.conf（单文件，data dir 内） | my.cnf 搜索路径（本机 /etc/my.cnf） |
 | 运行时持久化 | ALTER SYSTEM → postgresql.auto.conf | SET PERSIST → mysqld-auto.cnf（datadir 内） |
-| 生效值视图 | pg_settings（含 source/pending_restart） | SHOW VARIABLES / @@（无来源列；P_S 的 variables_info 本机不可用） |
+| 生效值视图 | pg_settings（含 source/pending_restart） | SHOW VARIABLES / @@（无来源列）；来源查询：performance_schema.variables_info（P_S=OFF 仍可查） |
 | 改法判断 | context（postmaster/sighup/superuser/user） | 直接试：静态报 ERROR 1238；动态可 SET GLOBAL |
 | reload | pg_reload_conf()（sighup 生效） | 无全局 reload；SET GLOBAL/PERSIST 即时生效 |
 | 重启标志 | pg_settings.pending_restart=t | 无等价物；用 SET PERSIST_ONLY 预写"待重启"参数 |
@@ -268,7 +269,7 @@ SET PERSIST 残留           重启前先看 mysqld-auto.cnf（曾有人 PERSIST
 1. **"参数从哪来"是改参数的第一问题**：先 `SHOW GLOBAL VARIABLES` 看现值，再 `my_print_defaults` + `mysqld-auto.cnf` + ps 命令行定位来源，最后决定改哪里。
 2. **在线改 vs 重启改的三态表**（见第 13 节）直接决定变更窗口：能 SET GLOBAL/PERSIST 的不需要停机。
 3. **PERSIST 是把双刃剑**：方便持久化，但残留值会在下次重启时覆盖 my.cnf——变更后要 `RESET PERSIST` 或确认 auto.cnf 内容。
-4. **P_S=OFF 影响"参数来源"查询**：`performance_schema.variables_info` 不可用，运维脚本要兼容。
+4. **"参数来源"第一选择是 `performance_schema.variables_info`**：v1.1 实测 P_S=OFF 时该 setup 表仍可用（`VARIABLE_SOURCE`：COMPILED/GLOBAL/COMMAND_LINE/DYNAMIC/PERSISTED + `VARIABLE_PATH` + `SET_TIME/SET_USER`），比 my_print_defaults 更能区分"配置文件/命令行/动态改过"；P_S=OFF 禁用的只是 instrumentation 事件表。
 5. **旧文档毒药**：server_id 在 8.0+ 已是动态参数；判断"能否在线改"以当前版本实测为准。
 
 ---
@@ -281,6 +282,7 @@ SET PERSIST 残留           重启前先看 mysqld-auto.cnf（曾有人 PERSIST
 - ❌ "需要重启的参数只能靠猜" → 实测：静态参数 SET GLOBAL 报 1238；PERSIST_ONLY 可预写。
 - ❌ "pg_reload_conf() 有对应物" → MySQL 没有全局 reload；在线参数改完立即生效，静态参数必须重启。
 - ❌ "server_id 是静态的" → 8.0+ 已动态（本机实测 SET GLOBAL server_id 成功）。
+- ❌ "P_S=OFF 就看不了参数来源" → v1.1 实测 `performance_schema.variables_info` 是 setup 表，P_S=OFF 仍可查（来源/路径/修改人时间全有）；information_schema.global_variables 在 8.4 反而已移除。
 
 ---
 
@@ -288,7 +290,8 @@ SET PERSIST 残留           重启前先看 mysqld-auto.cnf（曾有人 PERSIST
 
 ```text
 [ ] SHOW GLOBAL VARIABLES LIKE '目标参数'       记录当前生效值
-[ ] my_print_defaults mysqld                   看配置链现有设置
+[ ] SELECT * FROM performance_schema.variables_info WHERE VARIABLE_NAME=...  来源/路径/修改人（P_S=OFF 也可查）
+[ ] my_print_defaults mysqld                   看配置链现有设置（兜底）
 [ ] cat <datadir>/mysqld-auto.cnf              看 PERSIST 残留
 [ ] ps -ef | grep mysqld                       看启动命令行参数
 [ ] 确认参数类型：SESSION/GLOBAL/静态（试 SET GLOBAL 看是否 1238）
@@ -335,5 +338,6 @@ PG 对照：user/superuser ≈ SET SESSION/全局动态；sighup ≈ 在线动�
 |---|---|
 | evidence/pg-config.txt | PG：context 分层、ALTER SYSTEM+reload、pending_restart=t、session SET、auto.conf 清理 |
 | evidence/mysql-config.txt | MySQL：搜索路径、my_print_defaults、三式读取、SESSION/GLOBAL/PERSIST/PERSIST_ONLY、1238、重启验证、还原 |
+| evidence/selfcheck-variables_info.txt | 2026-09-01 理解验证自测 8 步全记录 + variables_info 可用性修正证据 |
 
 相关资产：`study_record/environment-baseline.md`、`study_record/pg-mysql-map.md`、`study_record/runbook/mysql-dba-cheatsheet.md`
