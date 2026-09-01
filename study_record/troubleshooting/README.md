@@ -6,8 +6,8 @@
 
 | CASE | 主题 | 状态 | 关联专题 | 已有证据 |
 |---|---|---|---|---|
-| CASE-001 | Login Failed（1045） | 🔶 | ENV-004/007 | ENV-004 evidence（mysql-privilege-errors.txt：1045 密码错/用户不存在/空密码 TCP） |
-| CASE-002 | Access Denied（1142/1143/1147） | 🔶 | ENV-004 | ENV-004 evidence（1142 表/1143 列/1147 无此授权/1044 库） |
+| CASE-001 | Login Failed（1045） | ✅ 2026-09-01 | ENV-004/007 | troubleshooting/evidence/case001-login-failed-mysql.txt + case001-002-pg-comparison.txt；ENV-004 evidence（1045 密码错/用户不存在/空密码 TCP） |
+| CASE-002 | Access Denied（1044/1142/1143/1147） | ✅ 2026-09-01 | ENV-004 | troubleshooting/evidence/case002-access-denied-mysql.txt + case001-002-pg-comparison.txt；ENV-004 evidence（1142 表/1143 列/1147 无此授权/1044 库） |
 | CASE-003 | Too Many Connections | ⬜ | CONN-001 | - |
 | CASE-004 | Lock Wait | ⬜ | ISO-001 | - |
 | CASE-005 | Deadlock | ⬜ | ISO-001 | - |

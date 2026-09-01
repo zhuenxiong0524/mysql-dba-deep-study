@@ -1,0 +1,40 @@
+===== CASE-001 登录失败（MySQL 8.4.10 @3306，2026-09-01 实跑）=====
+环境：mysql -uroot -S /tmp/mysql.sock（root 仅 socket 空密码）；账号 lab_case001@localhost/pass001
+实验对象：mysql_lab_case 库 / t_emp 表（结束已清理）
+
+--- 0. 准备（root 视角）---
+user	host	plugin
+lab_case001	localhost	caching_sha2_password
+lab_case002	localhost	caching_sha2_password
+lab_case003	localhost	caching_sha2_password
+Grants for lab_case003@localhost
+GRANT USAGE ON *.* TO `lab_case003`@`localhost`
+GRANT SELECT (`name`) ON `mysql_lab_case`.`t_emp` TO `lab_case003`@`localhost`
+
+--- 1. 场景A：密码错误 ---
+$ MYSQL_PWD=wrong001 mysql -ulab_case001 -S /tmp/mysql.sock -e "SELECT 1;"
+ERROR 1045 (28000): Access denied for user 'lab_case001'@'localhost' (using password: YES)
+
+--- 2. 场景B：用户不存在 ---
+$ MYSQL_PWD=xxx mysql -unobody_user -S /tmp/mysql.sock -e "SELECT 1;"
+ERROR 1045 (28000): Access denied for user 'nobody_user'@'localhost' (using password: YES)
+
+--- 3. 场景C：host 不匹配（Account=localhost，TCP 127.0.0.1 连接）---
+$ MYSQL_PWD=pass001 mysql -ulab_case001 -h127.0.0.1 -P3306 -e "SELECT 1;"
+ERROR 1045 (28000): Access denied for user 'lab_case001'@'127.0.0.1' (using password: YES)
+
+--- 4. 对照：正确密码 + 匹配 host（socket）应成功 ---
+$ MYSQL_PWD=pass001 mysql -ulab_case001 -S /tmp/mysql.sock -e "SELECT USER(), CURRENT_USER();"
+USER()	CURRENT_USER()
+lab_case001@localhost	lab_case001@localhost
+
+--- 5. 排查：mysql.user（账号是否存在/哪个 host）---
+SELECT user, host FROM mysql.user WHERE user LIKE 'lab_case%' ORDER BY user;
+user	host
+lab_case001	localhost
+lab_case002	localhost
+lab_case003	localhost
+
+关键点：1045 的三个常见根因（密码错/账号不存在/host 不匹配）错误文本相同，
+靠 "user@host" 中出现的 host 提示判断是哪个环节失败；host 是账号身份的一部分，
+TCP 来源 IP 匹配不到 localhost 账号时同样 1045。

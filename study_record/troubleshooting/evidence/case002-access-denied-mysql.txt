@@ -1,0 +1,53 @@
+===== CASE-002 权限拒绝（MySQL 8.4.10 @3306，2026-09-01 实跑）=====
+环境：mysql -uroot -S /tmp/mysql.sock；账号 lab_case002（无授权）/ lab_case003（仅列授权）/ lab_case1142
+实验对象：mysql_lab_case 库 / t_emp(id,name,salary)（结束已清理）
+
+--- 1. 无任何授权：SELECT 表（先报 1044 库级，不是 1142）---
+$ MYSQL_PWD=pass002 mysql -ulab_case002 -S /tmp/mysql.sock mysql_lab_case -e "SELECT * FROM t_emp;"
+ERROR 1044 (42000): Access denied for user 'lab_case002'@'localhost' to database 'mysql_lab_case'
+
+--- 2. 有库级权限、无表级 SELECT：报 1142 ---
+$ root: GRANT INSERT ON mysql_lab_case.* TO 'lab_case1142'@'localhost';
+$ SHOW GRANTS FOR 'lab_case1142'@'localhost';
+Grants for lab_case1142@localhost
+GRANT USAGE ON *.* TO `lab_case1142`@`localhost`
+GRANT INSERT ON `mysql_lab_case`.* TO `lab_case1142`@`localhost`
+$ MYSQL_PWD=pass1142 mysql -ulab_case1142 -S /tmp/mysql.sock mysql_lab_case -e "SELECT * FROM t_emp;"
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'lab_case1142'@'localhost' for table 't_emp'
+（INSERT 本身成功，说明库级权限存在，仅 SELECT 被表级拒绝）
+
+--- 3. 列权限（仅授 name 列）：报 1143，且 SELECT * 报第一个无权列 ---
+$ root: GRANT SELECT(name) ON mysql_lab_case.t_emp TO 'lab_case003'@'localhost';
+$ MYSQL_PWD=pass003 mysql -ulab_case003 -S /tmp/mysql.sock mysql_lab_case -e "SELECT * FROM t_emp;"
+ERROR 1143 (42000) at line 1: SELECT command denied to user 'lab_case003'@'localhost' for column 'id' in table 't_emp'
+$ MYSQL_PWD=pass003 mysql -ulab_case003 -S /tmp/mysql.sock mysql_lab_case -e "SELECT name FROM t_emp;"
+name
+Alice
+Bob
+
+--- 4. 无建库权限：报 1044 ---
+$ MYSQL_PWD=pass002 mysql -ulab_case002 -S /tmp/mysql.sock -e "CREATE DATABASE hack_db;"
+ERROR 1044 (42000) at line 1: Access denied for user 'lab_case002'@'localhost' to database 'hack_db'
+
+--- 5. REVOKE 不存在的授权：报 1147（PG 侧是幂等成功，见对照文件）---
+$ mysql -uroot -S /tmp/mysql.sock -e "REVOKE SELECT ON mysql_lab_case.t_emp FROM 'lab_case002'@'localhost';"
+ERROR 1147 (42000) at line 1: There is no such grant defined for user 'lab_case002' on host 'localhost' on table 't_emp'
+
+--- 6. 附注：GRANT USAGE ON db.* 会被规范化成全局 USAGE ON *.* ---
+$ root: GRANT USAGE ON mysql_lab_case.* TO 'lab_case1142'@'localhost';
+$ SHOW GRANTS FOR 'lab_case1142'@'localhost';   → GRANT USAGE ON *.* TO ...
+（USAGE 是"无权限"占位符，只在 *.* 存在；SELECT 仍报 1044）
+
+--- 7. 排查：SHOW GRANTS 视角 ---
+SHOW GRANTS FOR 'lab_case002'@'localhost';   → GRANT USAGE ON *.* TO ...（只有占位符）
+SHOW GRANTS FOR 'lab_case003'@'localhost';   → GRANT USAGE ON *.* + GRANT SELECT (name) ON ...
+
+--- 8. 处理与验证恢复 ---
+$ root: GRANT SELECT ON mysql_lab_case.t_emp TO 'lab_case002'@'localhost';
+$ MYSQL_PWD=pass002 mysql -ulab_case002 -S /tmp/mysql.sock mysql_lab_case -e "SELECT * FROM t_emp;"
+id	name	salary
+1	Alice	20000.00
+2	Bob	18000.00
+
+关键点：权限检查逐层下探（全局→库→表→列）；无库权限报 1044、有库无表报 1142、
+有表无列报 1143；错误码顺序即排查路径。

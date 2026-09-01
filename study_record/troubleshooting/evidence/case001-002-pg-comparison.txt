@@ -1,0 +1,63 @@
+===== CASE-001/002 PG 18.4（54184）对照实验（2026-09-01 实跑）=====
+环境：PG 18.4 单实例（非 patroni，pg_ctl 启动）；pg_hba：127.0.0.1/local trust、192.168.101.0/24 md5
+角色 lab_case001/002/003（LOGIN PASSWORD）；库 pg_lab_case / 表 t_emp(id,name,salary)（结束已清理）
+
+--- CASE-001 对照 ---
+1) role 不存在（对应 MySQL 1045 user does not exist）
+$ psql -h 127.0.0.1 -p 54184 -U nobody_user -d postgres -c "SELECT 1;"
+psql: error: connection to server at "127.0.0.1", port 54184 failed: FATAL:  role "nobody_user" does not exist
+
+2) 密码错误（走 hba md5 行，对应 MySQL 1045 using password: YES）
+$ PGPASSWORD=wrong001 psql -h 192.168.101.129 -p 54184 -U lab_case001 -d pg_lab_case -c "SELECT 1;"
+psql: error: connection to server at "192.168.101.129", port 54184 failed: FATAL:  password authentication failed for user "lab_case001"
+
+3) 正确密码（md5）应成功
+$ PGPASSWORD=pass001 psql -h 192.168.101.129 -p 54184 -U lab_case001 -d pg_lab_case -c "SELECT current_user;"
+ current_user
+--------------
+ lab_case001
+(1 row)
+
+--- CASE-002 对照 ---
+4) 无表权限 SELECT（对应 MySQL 1142）
+$ psql -h 127.0.0.1 -p 54184 -U lab_case002 -d pg_lab_case -c "SELECT * FROM t_emp;"
+ERROR:  permission denied for table t_emp
+
+5) 列权限：GRANT SELECT(name) ON t_emp TO lab_case003
+   SELECT *  → ERROR:  permission denied for table t_emp
+   SELECT id → ERROR:  permission denied for table t_emp
+   SELECT name → 成功（Alice/Bob）
+   （差异：PG 18.4 列级授权下 SELECT * 和精确引用无权列都报 "for table"，不提示列名；
+     MySQL 报 "for column 'id'"。排查列授权用 information_schema.column_privileges）
+
+6) 无 CREATEDB 权限建库（对应 MySQL 1044）
+$ psql -h 127.0.0.1 -p 54184 -U lab_case002 -d postgres -c "CREATE DATABASE hack_db;"
+ERROR:  permission denied to create database
+
+7) REVOKE 不存在的授权（差异：PG 幂等成功，MySQL 报 1147）
+$ sudo -u postgres psql -p 54184 -d pg_lab_case -c "REVOKE SELECT ON t_emp FROM lab_case002;"
+REVOKE
+
+--- 排查与恢复对照 ---
+8) 排查：pg_roles（对应 mysql.user）
+SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname LIKE 'lab_case%';
+ lab_case001 | t / lab_case002 | t / lab_case003 | t
+
+9) 排查：information_schema.role_table_grants（表级授权）
+（lab_case003 只有列授权 → role_table_grants 空；列授权在 column_privileges）
+SELECT grantee, privilege_type, table_name, column_name
+  FROM information_schema.column_privileges WHERE grantee='lab_case003';
+ lab_case003 | SELECT | t_emp | name
+
+10) 恢复：GRANT SELECT ON t_emp TO lab_case002 后重试成功（同 MySQL）
+SELECT * FROM t_emp → Alice/Bob 两行
+
+--- 对照小结 ---
+身份不存在：PG "FATAL: role ... does not exist" vs MySQL "ERROR 1045 ... user 'nobody_user'@'localhost'"
+密码错：     PG "FATAL: password authentication failed" vs MySQL "ERROR 1045 ... (using password: YES)"
+host 匹配：  PG 由 pg_hba.conf 决定认证方式，角色与来源解耦；
+             MySQL host 是账号身份的一部分（Account=user@host），无匹配 Account 即 1045
+表权限：     PG "permission denied for table t_emp" vs MySQL 1142
+列权限：     PG 18.4 报 table 级（不提示列名）；MySQL 报 column 'id'
+建库：       PG "permission denied to create database" vs MySQL 1044
+REVOKE 幂等：PG 无感成功；MySQL ERROR 1147（需确认授权已存在）
