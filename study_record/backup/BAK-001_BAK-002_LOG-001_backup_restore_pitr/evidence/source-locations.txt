@@ -1,0 +1,92 @@
+BAK-001/002 + LOG-001 source anchors
+Generated/verified: 2026-09-02
+
+Percona XtraBackup 8.4.0-6
+source: /data/myhome/mydata/mysql-src/percona-xtrabackup-8.4.0-6
+tag: percona-xtrabackup-8.4.0-6
+commit: ec789837e7abf35fc5f1f54ae885f870d37883c5
+
+storage/innobase/xtrabackup/src/xtrabackup.cc:285
+  backup metadata states: full-backuped, log-applied, full-prepared, incremental
+storage/innobase/xtrabackup/src/xtrabackup.cc:2706-2759
+  read/write xtrabackup_checkpoints from_lsn, to_lsn, last_lsn
+storage/innobase/xtrabackup/src/xtrabackup.cc:4238-4685
+  xtrabackup_backup_func: redo manager, data copy, backup_start, stop_at, metadata
+storage/innobase/xtrabackup/src/xtrabackup.cc:4595-4598
+  from_lsn/to_lsn/last_lsn assignment
+storage/innobase/xtrabackup/src/xtrabackup.cc:5795
+  incremental delta application path
+storage/innobase/xtrabackup/src/xtrabackup.cc:6804-6845
+  xtrabackup_prepare_func metadata state parsing and exact LSN-chain check
+storage/innobase/xtrabackup/src/xtrabackup.cc:7216-7224
+  prepared redo must reach intended to_lsn
+storage/innobase/xtrabackup/src/xtrabackup.cc:7253-7259
+  transition to log-applied/full-prepared and incremental metadata update
+storage/innobase/xtrabackup/src/xtrabackup.cc:7948-8210
+  main option parsing and backup/prepare/copy-back dispatch
+storage/innobase/xtrabackup/src/redo_log.h:283-385
+  Redo_Log_Data_Manager fields and interface
+storage/innobase/xtrabackup/src/redo_log.cc:936-1018
+  Redo_Log_Data_Manager::init and ::start
+storage/innobase/xtrabackup/src/redo_log.cc:1126-1313
+  copy_once/copy_func/stop_at/close
+storage/innobase/xtrabackup/src/redo_log_consumer.cc:23-44
+  registered redo consumer check/init/advance
+storage/innobase/xtrabackup/src/backup_copy.cc:1410-1545
+  backup_start locking, non-InnoDB copy, binary-log flush, log status/catchup
+storage/innobase/xtrabackup/src/backup_mysql.cc:1078-1096
+  LOCK INSTANCE FOR BACKUP execution
+storage/innobase/xtrabackup/src/backup_mysql.cc:1169-1218
+  backup lock versus FTWRL selection and unlock
+storage/innobase/xtrabackup/src/backup_mysql.cc:1802-1835
+  xtrabackup_binlog_info writer
+storage/innobase/xtrabackup/src/write_filt.cc:123-220
+  incremental page-LSN filter
+
+MySQL 8.4.10
+source: /data/myhome/mydata/mysql-src/mysql-8.4.10
+
+sql/sql_yacc.yy:16157
+  LOCK INSTANCE grammar
+sql/sql_backup_lock.cc:59-67
+  Sql_cmd_lock_instance::execute and BACKUP_ADMIN check
+sql/sql_backup_lock.cc:81-123
+  Shared_backup_lock_guard
+sql/sql_backup_lock.cc:177-213
+  acquire_exclusive_backup_lock using backup MDL
+sql/binlog.cc:3357-3410
+  binlog purge/reset backup-lock guards
+sql/binlog.cc:7394-7410
+  additional binlog backup-lock guard
+client/mysqlbinlog.cc:1964-2009
+  start/stop datetime and position option definitions
+client/mysqlbinlog.cc:2460-2487
+  start applies to first log, stop applies to last; mid-event/transaction warnings
+client/mysqlbinlog.cc:3148-3185
+  option validation and raw-mode behavior
+
+PostgreSQL 18.4
+source: /data/soft/postgres/postgresql-18.4
+
+src/bin/pg_basebackup/pg_basebackup.c:1779-2010
+  pg_basebackup command construction and execution
+src/backend/replication/walsender.c:2139-2142
+  BASE_BACKUP protocol dispatch to SendBaseBackup
+src/backend/backup/basebackup.c:234-360
+  perform_base_backup and do_pg_backup_start coordination
+src/backend/backup/basebackup.c:983-1065
+  SendBaseBackup
+src/backend/access/transam/xlog.c:8814-9206
+  do_pg_backup_start workhorse
+src/backend/postmaster/pgarch.c:381-500
+  pgarch_ArchiverCopyLoop
+src/backend/postmaster/pgarch.c:517-590
+  pgarch_archiveXlog
+src/backend/access/transam/xlogarchive.c:434-505
+  XLogArchiveNotify and segment ready notification
+src/backend/access/transam/xlogrecovery.c:1671-1860
+  PerformWalRecovery loop and before/after stop checks
+src/backend/access/transam/xlogrecovery.c:2595-2740
+  recoveryStopsBefore: immediate, exclusive LSN/time/XID targets
+src/backend/access/transam/xlogrecovery.c:2748-2825
+  recoveryStopsAfter: named restore point and inclusive targets
