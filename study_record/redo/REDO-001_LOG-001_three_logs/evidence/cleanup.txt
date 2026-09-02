@@ -1,0 +1,10 @@
+REDO-001+LOG-001 cleanup verification
+Captured: 2026-09-02
+
+Before cleanup:
+mysql_lab_redo_log count = 1
+pg_lab_redo_log count    = 1
+
+After cleanup:
+mysql_lab_redo_log count = 0
+pg_lab_redo_log count    = 0

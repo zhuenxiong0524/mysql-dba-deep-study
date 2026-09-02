@@ -1,0 +1,56 @@
+REDO-001+LOG-001 PostgreSQL 18.4 evidence
+Captured: 2026-09-02
+
+===== commit and rollback LSN =====
+CREATE TABLE
+Pager usage is off.
+  phase   |    lsn
+----------+------------
+ BASELINE | 0/2A177F60
+(1 row)
+
+BEGIN
+INSERT 0 1
+UPDATE 1
+      phase       | id  |       note        | amount
+------------------+-----+-------------------+--------
+ INSIDE_COMMIT_TX | 101 | commit-wal-marker |    101
+(1 row)
+
+COMMIT
+    phase     |    lsn
+--------------+------------
+ AFTER_COMMIT | 0/2A1780E0
+(1 row)
+
+BEGIN
+INSERT 0 1
+UPDATE 1
+       phase        | id  |        note         | amount
+--------------------+-----+---------------------+--------
+ INSIDE_ROLLBACK_TX | 202 | rollback-wal-marker |    202
+(1 row)
+
+ROLLBACK
+     phase      |    lsn
+----------------+------------
+ AFTER_ROLLBACK | 0/2A1781E8
+(1 row)
+
+ id  |       note        | amount
+-----+-------------------+--------
+ 101 | commit-wal-marker |    101
+(1 row)
+
+
+
+===== pg_waldump 0/2A177F60..0/2A1781E8 =====
+rmgr: Heap        len (rec/tot):     83/    83, tx:       1582, lsn: 0/2A177F60, prev 0/2A177C38, desc: INSERT+INIT off: 1, flags: 0x00, blkref #0: rel 1663/93380/93381 blk 0
+rmgr: Btree       len (rec/tot):     90/    90, tx:       1582, lsn: 0/2A177FB8, prev 0/2A177F60, desc: NEWROOT level: 0, blkref #0: rel 1663/93380/93387 blk 1, blkref #2: rel 1663/93380/93387 blk 0
+rmgr: Btree       len (rec/tot):     64/    64, tx:       1582, lsn: 0/2A178030, prev 0/2A177FB8, desc: INSERT_LEAF off: 1, blkref #0: rel 1663/93380/93387 blk 1
+rmgr: Heap        len (rec/tot):     71/    71, tx:       1582, lsn: 0/2A178070, prev 0/2A178030, desc: HOT_UPDATE old_xmax: 1582, old_off: 1, old_infobits: [], flags: 0x60, new_xmax: 0, new_off: 2, blkref #0: rel 1663/93380/93381 blk 0
+rmgr: Transaction len (rec/tot):     34/    34, tx:       1582, lsn: 0/2A1780B8, prev 0/2A178070, desc: COMMIT 2026-09-02 10:14:08.037630 CST
+rmgr: Heap        len (rec/tot):     83/    83, tx:       1583, lsn: 0/2A1780E0, prev 0/2A1780B8, desc: INSERT off: 3, flags: 0x00, blkref #0: rel 1663/93380/93381 blk 0
+rmgr: Btree       len (rec/tot):     64/    64, tx:       1583, lsn: 0/2A178138, prev 0/2A1780E0, desc: INSERT_LEAF off: 2, blkref #0: rel 1663/93380/93387 blk 1
+rmgr: Heap        len (rec/tot):     71/    71, tx:       1583, lsn: 0/2A178178, prev 0/2A178138, desc: HOT_UPDATE old_xmax: 1583, old_off: 3, old_infobits: [], flags: 0x60, new_xmax: 0, new_off: 4, blkref #0: rel 1663/93380/93381 blk 0
+rmgr: Transaction len (rec/tot):     34/    34, tx:       1583, lsn: 0/2A1781C0, prev 0/2A178178, desc: ABORT 2026-09-02 10:14:08.041988 CST

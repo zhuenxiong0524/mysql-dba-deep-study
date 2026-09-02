@@ -100,12 +100,14 @@
 ## REDO 日志与恢复
 
 ### REDO-001 redo log 与崩溃恢复（L，P1）
+- ✅ 阶段 1（2026-09-02）：redo/undo/binlog 正常提交与回滚边界已完成；crash recovery 待计划 11
 - PG：WAL（LSN/checkpoint/full_page_writes/pg_waldump）
 - MySQL：InnoDB redo（LSN、group commit、innodb_flush_log_at_trx_commit、#innodb_redo、fuzzy checkpoint/adaptive flush）
 - 实验：kill -9 崩溃恢复两边跑，对比 WAL 与 redo 日志内容、恢复日志输出
 - 源码：PG src/backend/access/transam/xlog.c；MySQL storage/innobase/log/log0log.cc、log0chkp.cc
 
 ### LOG-001 binlog 与 PITR（L，P2）
+- ✅ 阶段 1（2026-09-02）：ROW binlog 提交/回滚与 redo 协调已完成；PITR 待计划 12
 - PG：WAL 归档 + restore_command 做时间点恢复；MySQL：binlog（statement/row/mixed）+ GTID + mysqlbinlog PITR
 - 关键差异：MySQL 双日志体系（redo 本地崩溃恢复 / binlog 逻辑恢复+复制），PG 单 WAL
 - 运维点：binlog 磁盘管理（binlog_expire_logs_seconds）
@@ -233,7 +235,7 @@
 ### 第三阶段：数据出问题能恢复（P0）
 | 顺序 | 专题 | 任务 ID | 状态 |
 |---|---|---|---|
-| 10 | Redo/Undo/Binlog 三日志 | REDO-001 + LOG-001 | 未开始 |
+| 10 | Redo/Undo/Binlog 三日志 | REDO-001 + LOG-001 | ✅ 阶段 1 完成 2026-09-02 |
 | 11 | Crash Recovery（专用实验实例） | REDO-001 | 未开始 |
 | 12 | Backup/Restore/PITR | BAK-001/002 + LOG-001 | 未开始 |
 

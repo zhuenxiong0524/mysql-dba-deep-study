@@ -1,0 +1,237 @@
+REDO-001+LOG-001 MySQL 8.4.10 evidence
+Captured: 2026-09-02
+
+===== configuration =====
++---------+---------+---------------+-----------+-------------+--------------+---------------+---------------+
+| version | log_bin | binlog_format | gtid_mode | sync_binlog | innodb_flush | redo_capacity | binlog_expire |
++---------+---------+---------------+-----------+-------------+--------------+---------------+---------------+
+| 8.4.10  |       1 | ROW           | OFF       |           1 |            1 |     100663296 |       2592000 |
++---------+---------+---------------+-----------+-------------+--------------+---------------+---------------+
++---------------+----------+--------------+------------------+-------------------+
+| File          | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++---------------+----------+--------------+------------------+-------------------+
+| binlog.000017 |      158 |              |                  |                   |
++---------------+----------+--------------+------------------+-------------------+
+PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+on
+replica
+off
+
+
+===== commit and rollback =====
+--------------
+SELECT 'BASELINE' AS phase
+--------------
+
++----------+
+| phase    |
++----------+
+| BASELINE |
++----------+
+--------------
+SHOW BINARY LOG STATUS
+--------------
+
++---------------+----------+--------------+------------------+-------------------+
+| File          | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++---------------+----------+--------------+------------------+-------------------+
+| binlog.000017 |      926 |              |                  |                   |
++---------------+----------+--------------+------------------+-------------------+
+--------------
+SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_redo_log_checkpoint_lsn','Innodb_redo_log_current_lsn','Innodb_redo_log_flushed_to_disk_lsn','Binlog_cache_use')
+--------------
+
++-------------------------------------+-----------+
+| Variable_name                       | Value     |
++-------------------------------------+-----------+
+| Binlog_cache_use                    | 2         |
+| Innodb_redo_log_checkpoint_lsn      | 713700965 |
+| Innodb_redo_log_current_lsn         | 713716367 |
+| Innodb_redo_log_flushed_to_disk_lsn | 713716367 |
++-------------------------------------+-----------+
+--------------
+START TRANSACTION
+--------------
+
+--------------
+INSERT INTO t_log_lab VALUES (101,'commit-redo-binlog-marker',100)
+--------------
+
+--------------
+UPDATE t_log_lab SET amount=amount+1 WHERE id=101
+--------------
+
+--------------
+SELECT 'INSIDE_COMMIT_TX' AS phase,id,note,amount FROM t_log_lab WHERE id=101
+--------------
+
++------------------+-----+---------------------------+--------+
+| phase            | id  | note                      | amount |
++------------------+-----+---------------------------+--------+
+| INSIDE_COMMIT_TX | 101 | commit-redo-binlog-marker |    101 |
++------------------+-----+---------------------------+--------+
+--------------
+COMMIT
+--------------
+
+--------------
+SELECT 'AFTER_COMMIT' AS phase
+--------------
+
++--------------+
+| phase        |
++--------------+
+| AFTER_COMMIT |
++--------------+
+--------------
+SHOW BINARY LOG STATUS
+--------------
+
++---------------+----------+--------------+------------------+-------------------+
+| File          | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++---------------+----------+--------------+------------------+-------------------+
+| binlog.000017 |     1460 |              |                  |                   |
++---------------+----------+--------------+------------------+-------------------+
+--------------
+SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_redo_log_checkpoint_lsn','Innodb_redo_log_current_lsn','Innodb_redo_log_flushed_to_disk_lsn','Binlog_cache_use')
+--------------
+
++-------------------------------------+-----------+
+| Variable_name                       | Value     |
++-------------------------------------+-----------+
+| Binlog_cache_use                    | 3         |
+| Innodb_redo_log_checkpoint_lsn      | 713700965 |
+| Innodb_redo_log_current_lsn         | 713716367 |
+| Innodb_redo_log_flushed_to_disk_lsn | 713716367 |
++-------------------------------------+-----------+
+--------------
+START TRANSACTION
+--------------
+
+--------------
+INSERT INTO t_log_lab VALUES (202,'rollback-undo-marker',200)
+--------------
+
+--------------
+UPDATE t_log_lab SET amount=amount+2 WHERE id=202
+--------------
+
+--------------
+SELECT 'INSIDE_ROLLBACK_TX' AS phase,id,note,amount FROM t_log_lab WHERE id=202
+--------------
+
++--------------------+-----+----------------------+--------+
+| phase              | id  | note                 | amount |
++--------------------+-----+----------------------+--------+
+| INSIDE_ROLLBACK_TX | 202 | rollback-undo-marker |    202 |
++--------------------+-----+----------------------+--------+
+--------------
+ROLLBACK
+--------------
+
+--------------
+SELECT 'AFTER_ROLLBACK' AS phase
+--------------
+
++----------------+
+| phase          |
++----------------+
+| AFTER_ROLLBACK |
++----------------+
+--------------
+SELECT id,note,amount FROM t_log_lab ORDER BY id
+--------------
+
++-----+---------------------------+--------+
+| id  | note                      | amount |
++-----+---------------------------+--------+
+| 101 | commit-redo-binlog-marker |    101 |
++-----+---------------------------+--------+
+--------------
+SHOW BINARY LOG STATUS
+--------------
+
++---------------+----------+--------------+------------------+-------------------+
+| File          | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++---------------+----------+--------------+------------------+-------------------+
+| binlog.000017 |     1460 |              |                  |                   |
++---------------+----------+--------------+------------------+-------------------+
+--------------
+SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_redo_log_checkpoint_lsn','Innodb_redo_log_current_lsn','Innodb_redo_log_flushed_to_disk_lsn','Binlog_cache_use')
+--------------
+
++-------------------------------------+-----------+
+| Variable_name                       | Value     |
++-------------------------------------+-----------+
+| Binlog_cache_use                    | 4         |
+| Innodb_redo_log_checkpoint_lsn      | 713700965 |
+| Innodb_redo_log_current_lsn         | 713719275 |
+| Innodb_redo_log_flushed_to_disk_lsn | 713718673 |
++-------------------------------------+-----------+
+
+
+===== decoded committed binlog range 926..1460 =====
+# The proper term is pseudo_replica_mode, but we use this compatibility alias
+# to make the statement usable on server versions 8.0.24 and older.
+/*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;
+/*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
+DELIMITER /*!*/;
+# at 158
+#260902 10:12:24 server id 1  end_log_pos 127 CRC32 0x50f94cc3 	Start: binlog v 4, server v 8.4.10 created 260902 10:12:24 at startup
+# Warning: this binlog is either in use or was not closed properly.
+ROLLBACK/*!*/;
+# at 926
+#260902 10:13:33 server id 1  end_log_pos 1005 CRC32 0xcc01afcb 	Anonymous_GTID	last_committed=3	sequence_number=4	rbr_only=yes	original_committed_timestamp=1788315213085631	immediate_commit_timestamp=1788315213085631	transaction_length=534
+/*!50718 SET TRANSACTION ISOLATION LEVEL READ COMMITTED*//*!*/;
+# original_commit_timestamp=1788315213085631 (2026-09-02 10:13:33.085631 CST)
+# immediate_commit_timestamp=1788315213085631 (2026-09-02 10:13:33.085631 CST)
+/*!80001 SET @@session.original_commit_timestamp=1788315213085631*//*!*/;
+/*!80014 SET @@session.original_server_version=80410*//*!*/;
+/*!80014 SET @@session.immediate_server_version=80410*//*!*/;
+SET @@SESSION.GTID_NEXT= 'ANONYMOUS'/*!*/;
+# at 1005
+#260902 10:13:33 server id 1  end_log_pos 1094 CRC32 0xfd26a363 	Query	thread_id=12	exec_time=0	error_code=0
+SET TIMESTAMP=1788315213/*!*/;
+SET @@session.pseudo_thread_id=12/*!*/;
+SET @@session.foreign_key_checks=1, @@session.sql_auto_is_null=0, @@session.unique_checks=1, @@session.autocommit=1/*!*/;
+SET @@session.sql_mode=1168113696/*!*/;
+SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/*!*/;
+/*!\C utf8mb4 *//*!*/;
+SET @@session.character_set_client=255,@@session.collation_connection=255,@@session.collation_server=255/*!*/;
+SET @@session.lc_time_names=0/*!*/;
+SET @@session.collation_database=DEFAULT/*!*/;
+/*!80011 SET @@session.default_collation_for_utf8mb4=255*//*!*/;
+BEGIN
+/*!*/;
+# at 1094
+#260902 10:13:33 server id 1  end_log_pos 1172 CRC32 0xd7fe3fca 	Table_map: `mysql_lab_redo_log`.`t_log_lab` mapped to number 91
+# has_generated_invisible_primary_key=0
+# at 1172
+#260902 10:13:33 server id 1  end_log_pos 1243 CRC32 0x3147e44a 	Write_rows: table id 91 flags: STMT_END_F
+### INSERT INTO `mysql_lab_redo_log`.`t_log_lab`
+### SET
+###   @1=101 /* INT meta=0 nullable=0 is_null=0 */
+###   @2='commit-redo-binlog-marker' /* VARSTRING(320) meta=320 nullable=0 is_null=0 */
+###   @3=100 /* INT meta=0 nullable=0 is_null=0 */
+# at 1243
+#260902 10:13:33 server id 1  end_log_pos 1321 CRC32 0x94bdb687 	Table_map: `mysql_lab_redo_log`.`t_log_lab` mapped to number 91
+# has_generated_invisible_primary_key=0
+# at 1321
+#260902 10:13:33 server id 1  end_log_pos 1429 CRC32 0x33101952 	Update_rows: table id 91 flags: STMT_END_F
+### UPDATE `mysql_lab_redo_log`.`t_log_lab`
+### WHERE
+###   @1=101 /* INT meta=0 nullable=0 is_null=0 */
+###   @2='commit-redo-binlog-marker' /* VARSTRING(320) meta=320 nullable=0 is_null=0 */
+###   @3=100 /* INT meta=0 nullable=0 is_null=0 */
+### SET
+###   @1=101 /* INT meta=0 nullable=0 is_null=0 */
+###   @2='commit-redo-binlog-marker' /* VARSTRING(320) meta=320 nullable=0 is_null=0 */
+###   @3=101 /* INT meta=0 nullable=0 is_null=0 */
+# at 1429
+#260902 10:13:33 server id 1  end_log_pos 1460 CRC32 0xeb0abb61 	Xid = 32
+COMMIT/*!*/;
+SET @@SESSION.GTID_NEXT= 'AUTOMATIC' /* added by mysqlbinlog */ /*!*/;
+DELIMITER ;
+# End of log file
+/*!50003 SET COMPLETION_TYPE=@OLD_COMPLETION_TYPE*/;
+/*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=0*/;

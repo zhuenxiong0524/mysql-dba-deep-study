@@ -24,6 +24,8 @@
 | Index Only Scan + INCLUDE + visibility map | Covering index (`Using index`) | 🔶 | PG 即使 Index Only 也可能 Heap Fetch；InnoDB 投影覆盖通常免常规回表，但 MVCC 可见性不足时仍可能访问聚簇记录 | IDX-001 |
 | 无 PRIMARY KEY 的 heap 表 | 隐藏 `GEN_CLUST_INDEX` + `DB_ROW_ID` | ❌ | PG 仍是普通 heap；InnoDB 永远需要聚簇索引，隐藏键不可供业务稳定引用 | IDX-001 |
 | WAL | InnoDB Redo + Binlog | ❌ | 双日志体系：redo 崩溃恢复 / binlog 复制+PITR | REDO-001/LOG-001 |
+| WAL 中同时含数据变更与 COMMIT/ABORT | InnoDB redo/undo + 仅提交事务进入 binlog | ❌ | 可回滚事务会推进 redo LSN，但事务 binlog cache 被截断，position 不前进 | REDO-001/LOG-001 |
+| synchronous_commit | innodb_flush_log_at_trx_commit + sync_binlog | ❌ | PG 一个 WAL 刷盘维度；MySQL 必须同时评估 redo 与 binlog 两侧故障窗口 | REDO-001/LOG-001 |
 | 表文件（base/<oid>/<relfilenode>） | 库名/表.ibd（file-per-table） | 🔶 | PG 文件是裸数字 relfilenode；MySQL 文件名一眼可读；8.4 字典在 mysql.ibd、ibdata1 不再膨胀 | ENG-002 |
 | VACUUM (FULL) / TRUNCATE | OPTIMIZE TABLE / TRUNCATE TABLE | 🔶 | 都重写/换文件；PG VACUUM FULL=CLUSTER 变体，MySQL OPTIMIZE=ALTER 重建；TRUNCATE 都回到初始文件 | ENG-002 |
 | VACUUM / autovacuum + OldestXmin | Purge 线程 + oldest ReadView + History List Length | ❌ | 长快照都拖住清理；PG 留 dead heap tuples，InnoDB 留 update undo/history | MVCC-001 |

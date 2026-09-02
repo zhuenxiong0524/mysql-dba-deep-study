@@ -1,0 +1,269 @@
+MySQL 8.4.10 / PostgreSQL 18.4 source anchors
+Captured: 2026-09-02
+Order: undo generation; redo durability; binlog rollback; binlog prepare/group commit; PG WAL commit/abort.
+
+  2112	/** Writes information to an undo log about an insert, update, or a delete
+  2113	 marking of a clustered index record. This information is used in a rollback of
+  2114	 the transaction and in consistent reads that must look to the history of this
+  2115	 transaction.
+  2116	 @return DB_SUCCESS or error code */
+  2117	dberr_t trx_undo_report_row_operation(
+  2118	    ulint flags,                 /*!< in: if BTR_NO_UNDO_LOG_FLAG bit is
+  2119	                                 set, does nothing */
+  2120	    ulint op_type,               /*!< in: TRX_UNDO_INSERT_OP or
+  2121	                                 TRX_UNDO_MODIFY_OP */
+  2122	    que_thr_t *thr,              /*!< in: query thread */
+  2123	    dict_index_t *index,         /*!< in: clustered index */
+  2124	    const dtuple_t *clust_entry, /*!< in: in the case of an insert,
+  2125	                                 index entry to insert into the
+  2126	                                 clustered index, otherwise NULL */
+  2127	    const upd_t *update,         /*!< in: in the case of an update,
+  2128	                                 the update vector, otherwise NULL */
+  2129	    ulint cmpl_info,             /*!< in: compiler info on secondary
+  2130	                                 index updates */
+  2131	    const rec_t *rec,            /*!< in: in case of an update or delete
+  2132	                                 marking, the record in the clustered
+  2133	                                 index, otherwise NULL */
+  2134	    const ulint *offsets,        /*!< in: rec_get_offsets(rec) */
+  2135	    roll_ptr_t *roll_ptr)        /*!< out: rollback pointer to the
+  2136	                                 inserted undo log record,
+  2137	                                 0 if BTR_NO_UNDO_LOG
+  2138	                                 flag was specified */
+  1756	/** If required, flushes the log to disk based on the value of
+  1757	 innodb_flush_log_at_trx_commit. */
+  1758	static void trx_flush_log_if_needed_low(lsn_t lsn) /*!< in: lsn up to which logs
+  1759	                                                   are to be flushed. */
+  1760	{
+  1761	#ifdef _WIN32
+  1762	  bool flush = true;
+  1763	#else
+  1764	  bool flush = srv_unix_file_flush_method != SRV_UNIX_NOSYNC;
+  1765	#endif /* _WIN32 */
+  1766
+  1767	  Wait_stats wait_stats;
+  1768
+  1769	  switch (srv_flush_log_at_trx_commit) {
+  1770	    case 2:
+  1771	      /* Write the log but do not flush it to disk */
+  1772	      flush = false;
+  1773	      [[fallthrough]];
+  1774	    case 1:
+  1775	      /* Write the log and optionally flush it to disk */
+  1776	      wait_stats = log_write_up_to(*log_sys, lsn, flush);
+  1777
+  1778	      MONITOR_INC_WAIT_STATS(MONITOR_TRX_ON_LOG_, wait_stats);
+  1779
+  1780	      return;
+  1781	    case 0:
+  1782	      /* Do nothing */
+  1783	      return;
+  1784	  }
+  2052	    /* Depending on the my.cnf options, we may now write the log
+  2053	    buffer to the log files, making the transaction durable if
+  2054	    the OS does not crash. We may also flush the log files to
+  2055	    disk, making the transaction durable also at an OS crash or a
+  2056	    power outage.
+  2057
+  2058	    The idea in InnoDB's group commit is that a group of
+  2059	    transactions gather behind a trx doing a physical disk write
+  2060	    to log files, and when that physical write has been completed,
+  2061	    one of those transactions does a write which commits the whole
+  2062	    group. Note that this group commit will only bring benefit if
+  2063	    there are > 2 users in the database. Then at least 2 users can
+  2064	    gather behind one doing the physical log write to disk.
+  2065
+  2066	    If we are calling trx_commit() under prepare_commit_mutex, we
+  2067	    will delay possible log write and flush to a separate function
+  2068	    trx_commit_complete_for_mysql(), which is only called when the
+  2069	    thread has released the mutex. This is to make the
+  2070	    group commit algorithm to work. Otherwise, the prepare_commit
+  2071	    mutex would serialize all commits and prevent a group of
+  2072	    transactions from gathering. */
+  2073
+  2074	    lsn_t lsn = mtr->commit_lsn();
+  2075
+  2076	    if (lsn == 0) {
+  2077	      /* Nothing to be done. */
+  2078	    } else if (trx->flush_log_later) {
+  2079	      /* Do nothing yet */
+  2080	      trx->must_flush_log_later = true;
+  2081
+  2082	      /* Remember current ddl_operation, because trx_init()
+  2083	      later will set ddl_operation to false. And the final
+  2084	      flush is even later. */
+  2085	      trx->ddl_must_flush = trx->ddl_operation;
+  2086	    } else if ((srv_flush_log_at_trx_commit == 0 ||
+  2087	                thd_requested_durability(trx->mysql_thd) ==
+  2088	                    HA_IGNORE_DURABILITY) &&
+  2089	               (!trx->ddl_operation)) {
+  2090	      /* Do nothing */
+  2091	    } else {
+  2092	      trx_flush_log_if_needed(lsn, trx);
+  2093	    }
+  2094
+  2095	    trx->commit_lsn = lsn;
+  2877	        If the transaction is being rolled back and contains changes that
+  2878	        cannot be rolled back, the trx-cache's content is flushed.
+  2879	      */
+  2880	      Query_log_event end_evt(thd, query.data(), query.length(), true, false,
+  2881	                              true, 0, true);
+  2882	      error = thd->lex->sql_command != SQLCOM_XA_ROLLBACK
+  2883	                  ? cache_mngr->trx_cache.finalize(thd, &end_evt)
+  2884	                  : cache_mngr->trx_cache.finalize(thd, &end_evt, xs);
+  2885	      stuff_logged = true;
+  2886	    } else {
+  2887	      /*
+  2888	        If the transaction is being rolled back and its changes can be
+  2889	        rolled back, the trx-cache's content is truncated.
+  2890	      */
+  2891	      cache_mngr->trx_cache.truncate(thd, all);
+  2892
+  2893	      DBUG_EXECUTE_IF("ensure_binlog_cache_is_reset", {
+  2894	        /* Assert that binlog cache is reset at rollback time. */
+  2895	        assert(binlog_cache_is_reset);
+  2896	        binlog_cache_is_reset = false;
+  2897	      };);
+  8073	/*
+  8074	  Prepare the transaction in the transaction coordinator.
+  8075
+  8076	  This function will prepare the transaction in the storage engines
+  8077	  (by calling @c ha_prepare_low) what will write a prepare record
+  8078	  to the log buffers.
+  8079
+  8080	  @retval 0    success
+  8081	  @retval 1    error
+  8082	*/
+  8083	int MYSQL_BIN_LOG::prepare(THD *thd, bool all) {
+  8084	  DBUG_TRACE;
+  8085
+  8086	  assert(opt_bin_log);
+  8087
+  8088	  /*
+  8089	    Set HA_IGNORE_DURABILITY to not flush the prepared record of the
+  8090	    transaction to the log of storage engine (for example, InnoDB
+  8091	    redo log) during the prepare phase. So that we can flush prepared
+  8092	    records of transactions to the log of storage engine in a group
+  8093	    right before flushing them to binary log during binlog group
+  8094	    commit flush stage. Reset to HA_REGULAR_DURABILITY at the
+  8095	    beginning of parsing next command.
+  8096	  */
+  8097	  thd->durability_property = HA_IGNORE_DURABILITY;
+  8958	  /*
+  8959	    Stage #1: flushing transactions to binary log
+  8960
+  8961	    While flushing, we allow new threads to enter and will process
+  8962	    them in due time. Once the queue was empty, we cannot reap
+  8963	    anything more since it is possible that a thread entered and
+  8964	    appointed itself leader for the flush phase.
+  8965	  */
+  8966
+  8967	  if (change_stage(thd, Commit_stage_manager::BINLOG_FLUSH_STAGE, thd, nullptr,
+  8968	                   &LOCK_log)) {
+  8969	    DBUG_PRINT("return", ("Thread ID: %u, commit_error: %d", thd->thread_id(),
+  8970	                          thd->commit_error));
+  8971	    return finish_commit(thd);
+  8972	  }
+  9031	  /*
+  9032	    Stage #2: Syncing binary log file to disk
+  9033	  */
+  9034
+  9035	  if (change_stage(thd, Commit_stage_manager::SYNC_STAGE, wait_queue, &LOCK_log,
+  9036	                   &LOCK_sync)) {
+  9037	    DBUG_PRINT("return", ("Thread ID: %u, commit_error: %d", thd->thread_id(),
+  9038	                          thd->commit_error));
+  9039	    return finish_commit(thd);
+  9040	  }
+  9041
+  9042	  /*
+  9043	    Shall introduce a delay only if it is going to do sync
+  9044	    in this ongoing SYNC stage. The "+1" used below in the
+  9045	    if condition is to count the ongoing sync stage.
+  9046	    When sync_binlog=0 (where we never do sync in BGC group),
+  9047	    it is considered as a special case and delay will be executed
+  9048	    for every group just like how it is done when sync_binlog= 1.
+  9049	  */
+  9050	  if (!flush_error && (sync_counter + 1 >= get_sync_period()))
+  9051	    Commit_stage_manager::get_instance().wait_count_or_timeout(
+  9052	        opt_binlog_group_commit_sync_no_delay_count,
+  9053	        opt_binlog_group_commit_sync_delay, Commit_stage_manager::SYNC_STAGE);
+  9054
+  9055	  final_queue = Commit_stage_manager::get_instance().fetch_queue_acquire_lock(
+  9056	      Commit_stage_manager::SYNC_STAGE);
+  9057
+  9058	  if (flush_error == 0 && total_bytes > 0) {
+  9059	    DEBUG_SYNC(thd, "before_sync_binlog_file");
+  9060	    std::pair<bool, bool> result = sync_binlog_file(false);
+  9061	    sync_error = result.first;
+  9062	  }
+  9083	  leave_mutex_before_commit_stage = &LOCK_sync;
+  9084	  /*
+  9085	    Stage #3: Commit all transactions in order.
+  9086
+  9087	    This stage is skipped if we do not need to order the commits and
+  9088	    each thread have to execute the handlerton commit instead.
+  9089
+  9090	    However, since we are keeping the lock from the previous stage, we
+  9091	    need to unlock it if we skip the stage.
+  9092
+  9093	    We must also step commit_clock before the ha_commit_low() is called
+  9094	    either in ordered fashion (by the leader of this stage) or by the thread
+  9095	    themselves.
+  9096
+  9097	    We are delaying the handling of sync error until
+  9098	    all locks are released but we should not enter into
+  9099	    commit stage if binlog_error_action is ABORT_SERVER.
+  9100	  */
+  9101	commit_stage:
+  9102	  /* Clone needs binlog commit order. */
+  9103	  if ((opt_binlog_order_commits || Clone_handler::need_commit_order()) &&
+  9104	      (sync_error == 0 || binlog_error_action != ABORT_SERVER)) {
+  9105	    if (change_stage(thd, Commit_stage_manager::COMMIT_STAGE, final_queue,
+  9106	                     leave_mutex_before_commit_stage, &LOCK_commit)) {
+  9107	      DBUG_PRINT("return", ("Thread ID: %u, commit_error: %d", thd->thread_id(),
+  9108	                            thd->commit_error));
+  9109	      return finish_commit(thd);
+  1473		/*
+  1474		 * Check if we want to commit asynchronously.  We can allow the XLOG flush
+  1475		 * to happen asynchronously if synchronous_commit=off, or if the current
+  1476		 * transaction has not performed any WAL-logged operation or didn't assign
+  1477		 * an xid.  The transaction can end up not writing any WAL, even if it has
+  1478		 * an xid, if it only wrote to temporary and/or unlogged tables.  It can
+  1479		 * end up having written WAL without an xid if it did HOT pruning.  In
+  1480		 * case of a crash, the loss of such a transaction will be irrelevant;
+  1481		 * temp tables will be lost anyway, unlogged tables will be truncated and
+  1482		 * HOT pruning will be done again later. (Given the foregoing, you might
+  1483		 * think that it would be unnecessary to emit the XLOG record at all in
+  1484		 * this case, but we don't currently try to do that.  It would certainly
+  1485		 * cause problems at least in Hot Standby mode, where the
+  1486		 * KnownAssignedXids machinery requires tracking every XID assignment.  It
+  1487		 * might be OK to skip it only when wal_level < replica, but for now we
+  1488		 * don't.)
+  1489		 *
+  1490		 * However, if we're doing cleanup of any non-temp rels or committing any
+  1491		 * command that wanted to force sync commit, then we must flush XLOG
+  1492		 * immediately.  (We must not allow asynchronous commit if there are any
+  1493		 * non-temp tables to be deleted, because we might delete the files before
+  1494		 * the COMMIT record is flushed to disk.  We do allow asynchronous commit
+  1495		 * if all to-be-deleted tables are temporary though, since they are lost
+  1496		 * anyway if we crash.)
+  1497		 */
+  1498		if ((wrote_xlog && markXidCommitted &&
+  1499			 synchronous_commit > SYNCHRONOUS_COMMIT_OFF) ||
+  1500			forceSyncCommit || nrels > 0)
+  1501		{
+  1502			XLogFlush(XactLastRecEnd);
+  1503
+  1781		/*
+  1782		 * We have a valid XID, so we should write an ABORT record for it.
+  1783		 *
+  1784		 * We do not flush XLOG to disk here, since the default assumption after a
+  1785		 * crash would be that we aborted, anyway.  For the same reason, we don't
+  1786		 * need to worry about interlocking against checkpoint start.
+    18	 * StartupXLOG() is the main entry point of the startup process.  It
+    19	 * coordinates database startup, performing WAL recovery, and the
+    20	 * transition from WAL recovery into normal operations.
+    21	 *
+    22	 * XLogInsertRecord() inserts a WAL record into the WAL buffers.  Most
+    23	 * callers should not call this directly, but use the functions in
+    24	 * xloginsert.c to construct the WAL record.  XLogFlush() can be used
+    25	 * to force the WAL to disk.
