@@ -55,3 +55,25 @@ mysqlbinlog --base64-output=DECODE-ROWS -vv \
 ```sql
 DROP DATABASE IF EXISTS mysql_lab_redo_log;
 ```
+
+## 持久性参数矩阵（需要 SYSTEM_VARIABLES_ADMIN）
+
+下面的脚本按 `(innodb_flush_log_at_trx_commit, sync_binlog)` 六种组合各执行 100 次独立提交，
+记录耗时、InnoDB redo fsync 增量和 binlog 字节增量，并通过 `trap` 恢复原参数、删除实验库：
+
+```bash
+chmod +x evidence/mysql-durability-matrix.sh
+evidence/mysql-durability-matrix.sh
+```
+
+执行前也可手工记录原值；若脚本被 `kill -9`，用记录值恢复：
+
+```sql
+SELECT @@GLOBAL.innodb_flush_log_at_trx_commit, @@GLOBAL.sync_binlog;
+SET GLOBAL innodb_flush_log_at_trx_commit = 1;
+SET GLOBAL sync_binlog = 1;
+DROP DATABASE IF EXISTS mysql_lab_redo_log;
+```
+
+判断标准：`redo=1` 的 `Innodb_os_log_fsyncs` 增量应显著高于 0/2；所有组合的 binlog
+position 都会增长。后者只证明写入 binlog 文件，不能证明 `sync_binlog=0` 已经 fsync。

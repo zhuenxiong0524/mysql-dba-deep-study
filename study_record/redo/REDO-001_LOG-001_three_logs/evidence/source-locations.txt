@@ -267,3 +267,33 @@ Order: undo generation; redo durability; binlog rollback; binlog prepare/group c
     23	 * callers should not call this directly, but use the functions in
     24	 * xloginsert.c to construct the WAL record.  XLogFlush() can be used
     25	 * to force the WAL to disk.
+=== Deepening pass: commit durability and remote acknowledgement (2026-09-02) ===
+
+PostgreSQL 18.4
+- src/include/access/xact.h:68-80
+  SyncCommitLevel orders OFF, LOCAL_FLUSH, REMOTE_WRITE, REMOTE_FLUSH and
+  REMOTE_APPLY; synchronous_commit=on maps to REMOTE_FLUSH.
+- src/backend/access/transam/xact.c:1473-1531
+  Commit calls XLogFlush when synchronous_commit>OFF. OFF instead publishes
+  XLogSetAsyncXactLSN and delays CLOG commit visibility bookkeeping until WAL flush.
+- src/backend/access/transam/xact.c:1547-1557
+  After local commit bookkeeping, SyncRepWaitForLSN waits when the transaction
+  wrote WAL and committed an xid.
+- src/backend/replication/syncrep.c:1123-1140
+  remote_write/on/remote_apply select WAIT_WRITE/WAIT_FLUSH/WAIT_APPLY;
+  local/off select NO_WAIT for synchronous replication.
+
+MySQL 8.4.10
+- storage/innobase/trx/trx0trx.cc:1756-1802
+  trx_flush_log_if_needed_low: value 2 writes without flush; 1 writes and may
+  flush; 0 does nothing in the transaction commit path. DDL has a forced-flush path.
+- sql/binlog.cc:8915-9088
+  MYSQL_BIN_LOG::ordered_commit implements FLUSH, SYNC and COMMIT stages;
+  sync_binlog_file(false) is called in the SYNC stage and group members share it.
+- plugin/semisync/semisync_source_plugin.cc:66-117,300-325
+  AFTER_SYNC calls commitTrx from the binlog sync hook; AFTER_COMMIT calls it
+  after engine commit. The latter allows other source sessions to observe the
+  transaction while the client still waits for a replica reply.
+- plugin/semisync/semisync_source.cc:770-807
+  ACK wait uses timed wait; a real timeout increments the timeout counter and
+  switch_off() disables semi-sync waiting, creating an asynchronous fallback.

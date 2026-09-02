@@ -26,6 +26,8 @@
 | WAL | InnoDB Redo + Binlog | ❌ | 双日志体系：redo 崩溃恢复 / binlog 复制+PITR | REDO-001/LOG-001 |
 | WAL 中同时含数据变更与 COMMIT/ABORT | InnoDB redo/undo + 仅提交事务进入 binlog | ❌ | 可回滚事务会推进 redo LSN，但事务 binlog cache 被截断，position 不前进 | REDO-001/LOG-001 |
 | synchronous_commit | innodb_flush_log_at_trx_commit + sync_binlog | ❌ | PG 一个 WAL 刷盘维度；MySQL 必须同时评估 redo 与 binlog 两侧故障窗口 | REDO-001/LOG-001 |
+| synchronous_commit=local | innodb_flush_log_at_trx_commit=1 + sync_binlog=1 | 🔶 | 都追求本地持久，但 MySQL 是 redo/binlog 两日志及 binlog group 的同步边界 | REDO-001/LOG-001 |
+| remote_write/on/remote_apply | 半同步 ACK + 必要时等待 replica 执行 GTID | ❌ | AFTER_SYNC/AFTER_COMMIT 是源端钩子，均不天然等于 remote_apply；半同步还可能超时退回异步 | REDO-001/LOG-001 |
 | 表文件（base/<oid>/<relfilenode>） | 库名/表.ibd（file-per-table） | 🔶 | PG 文件是裸数字 relfilenode；MySQL 文件名一眼可读；8.4 字典在 mysql.ibd、ibdata1 不再膨胀 | ENG-002 |
 | VACUUM (FULL) / TRUNCATE | OPTIMIZE TABLE / TRUNCATE TABLE | 🔶 | 都重写/换文件；PG VACUUM FULL=CLUSTER 变体，MySQL OPTIMIZE=ALTER 重建；TRUNCATE 都回到初始文件 | ENG-002 |
 | VACUUM / autovacuum + OldestXmin | Purge 线程 + oldest ReadView + History List Length | ❌ | 长快照都拖住清理；PG 留 dead heap tuples，InnoDB 留 update undo/history | MVCC-001 |

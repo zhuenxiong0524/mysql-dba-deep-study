@@ -1,0 +1,31 @@
+Environment: MySQL 8.4.10, PostgreSQL 18.4, 2026-09-02
+
+MySQL: 100 independent autocommit INSERTs per setting pair
+version=8.4.10 original_redo=1 original_sync_binlog=1
+redo=1 sync_binlog=1 commits=100 elapsed_ms=775 innodb_log_fsync_delta=207 binlog_bytes_delta=32292 rows=100
+redo=1 sync_binlog=0 commits=100 elapsed_ms=853 innodb_log_fsync_delta=205 binlog_bytes_delta=32292 rows=200
+redo=2 sync_binlog=1 commits=100 elapsed_ms=740 innodb_log_fsync_delta=2 binlog_bytes_delta=32292 rows=300
+redo=2 sync_binlog=0 commits=100 elapsed_ms=666 innodb_log_fsync_delta=3 binlog_bytes_delta=32292 rows=400
+redo=0 sync_binlog=1 commits=100 elapsed_ms=762 innodb_log_fsync_delta=1 binlog_bytes_delta=32292 rows=500
+redo=0 sync_binlog=0 commits=100 elapsed_ms=751 innodb_log_fsync_delta=0 binlog_bytes_delta=32292 rows=600
+before_restore redo=0 sync_binlog=0
+trap restore verified after exit: redo=1 sync_binlog=1, test database absent
+
+Interpretation boundary:
+- Innodb_os_log_fsyncs measures InnoDB log fsync, not binlog fsync.
+- binlog_bytes_delta proves all committed transactions entered binlog; it does not prove stable-media sync.
+- elapsed_ms is an observation on a 1-CPU lab host, not a benchmark.
+
+PostgreSQL: 100 independent autocommit INSERTs per synchronous_commit mode
+synchronous_commit=on; synchronous_standby_names=''; wal_writer_delay=200ms
+on           insert_lsn=0/2A1AD598 flush_lsn=0/2A1AD598
+local        insert_lsn=0/2A1B3C18 flush_lsn=0/2A1B3C18
+remote_write insert_lsn=0/2A1B8578 flush_lsn=0/2A1B8578
+remote_apply insert_lsn=0/2A1BCEC0 flush_lsn=0/2A1BCEC0
+off          insert_lsn=0/2A1C1818 flush_lsn=0/2A1BCEC0 unflushed_bytes=18776
+rows_after_all_modes=500
+
+Interpretation boundary:
+- No synchronous standby is configured. remote_write/on/remote_apply therefore prove local flush
+  and lack of remote wait only; their remote acknowledgement levels are source-grounded, not lab-tested.
+- off returned with an observable insert/flush LSN gap. A later WAL-writer flush closes that window.
