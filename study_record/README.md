@@ -4,7 +4,8 @@ PG 18.4 → MySQL 8.4 对照学习记录与文章仓库。
 
 - 任务全集：`learning-roadmap.md`（ENV/ENG/MVCC/ISO/REDO/BUF/IDX/OPT/MON/CONN/REP/BAK/UPG/SQL/CHA/DR + 生产向执行计划 v0.5）
 - 目录结构：按主题分类，每专题 `<TASK_ID>_<slug>/` 含 `.idx.md`、`evidence/`、对照文章
-- 学习工作流：`.agents/skills/mysql_study/SKILL.md`
+- 学习工作流：`.agents/skills/mysql_study/SKILL.md`（默认深度快跑；MySQL 完整实操为硬性指标）
+- 专题验收：`.agents/skills/mysql_study/scripts/validate_topic.sh <专题目录>`
 - 横切资产：
   - `environment-baseline.md`：环境基线（实例/参数/连接方式）
   - `pg-mysql-map.md`：PG→MySQL 总映射表（随专题扩展）

@@ -3,7 +3,9 @@
 > 版本：v0.3（2026-08-26 修订：并入运维关键点 CONN/UPG/DR，CLONE 并入 BAK，容量管理并入 ENG/MVCC）
 > 基线：PostgreSQL 18.4（已掌握） → MySQL 8.4.10 LTS（学习中）
 > 任务 ID 前缀：ENV/ENG/MVCC/ISO/REDO/LOG/BUF/IDX/OPT/MON/CONN/REP/BAK/UPG/SQL/CHA/DR
-> 完成定义：专题目录含对照文章（PG 基线 + MySQL 源码定位 + 同实验 + 差异表 + Evidence）并经过理解验证
+> 完成定义：专题目录含深度对照文章（PG 基线 + MySQL 源码因果链 + 最小同构实验 + 差异表 + Evidence）
+> 以及可直接执行、判断和清理的完整 MySQL 命令/SQL；
+> 理解验证、独立 Runbook 与扩展实验按风险或用户要求添加
 
 ## 使用原则
 
@@ -207,7 +209,9 @@
 
 > 目标：以 PG 18.4 为参照系，按 6 阶段快速获得 MySQL 生产接管能力（P0=能运维生产 > P1=能深入分析 >>> P2=专家级）。
 > 与上面专题体系的关系：本计划是"执行顺序与优先级视图"，专题定义以本文件上方案列为准。
-> 每个专题闭环：PG 基线 → MySQL 机制 → 差异 → 同实验两边跑 → evidence → 对照文章 → 更新 pg-mysql-map.md → 汇报（不自动 commit）。
+> 每个专题默认深度快跑：待证明结论 → PG 基线 → MySQL 核心源码链 → 最小同构实验 → MySQL 完整实操
+> → 收敛 evidence/文章
+> → 仅按需更新 map/runbook/verification → 汇报（不自动 commit）；高风险或证据不足部分才升级深度模式。
 
 ### 第一阶段：敢登录、敢看、不会误操作（P0）
 | 顺序 | 专题 | 任务 ID | 状态 |

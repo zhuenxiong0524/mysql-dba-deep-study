@@ -55,21 +55,68 @@
 | 复制 | streaming/logical | binlog 主从复制 | 主从搭建与故障切换对照 |
 | 备份恢复 | pg_dump/pg_basebackup | mysqldump/逻辑与物理备份 | 同数据量备份恢复对比 |
 
-## 5. 对照文章模板
+## 5. 默认工作模式：深度快跑
+
+核心机制保持深度，过程通过批处理、自动化和去重提速。研究质量由因果解释、双引擎实验、
+源码证据和可复现操作决定，不由文章或 evidence 的长度决定。
+
+默认流程：
+
+1. 先列 3～7 条可证伪的待证明结论；
+2. 每个关键差异设计一个最小同构实验，PG/MySQL 各跑一次；
+3. 每条核心机制保留 1～3 个源码锚点，串起决策入口、关键分支和必要出口；
+4. 先形成唯一结论表，再派生文章、idx 和必要的横切资产；
+5. 清理实验环境并运行专题验收脚本。
+
+默认预算：
+
+- 文章通常 160～280 行，必须覆盖原因、边界、失败形态和生产影响；
+- 源码摘录通常为每个锚点上下各 10～15 行；
+- verification 仅在用户要求或理解风险高时创建；
+- map 只写新的心智映射，Runbook 只写新的生产处置内容；
+- 观察到锁等待等目标状态后主动释放，不等待超时。
+
+速度不能通过削弱 MySQL 实操换取。文章必须提供从连接/准备到执行、判断、清理的完整 MySQL
+命令或 SQL；PG 侧仍需实测留档，但正文可以只保留机制、结果和差异。
+
+## 6. 精简对照文章模板
 
 ```markdown
 # <主题>：PG vs MySQL 对照实验
-## 1. PG 基线（机制与结论）
-## 2. MySQL 对应机制（源码定位）
-## 3. 对照实验（同一实验设计，两边执行结果）
-## 4. 差异分析
-## 5. 心智迁移要点
-## 6. Evidence
+## 1. 结论速览（PG / MySQL / 迁移含义 / Evidence）
+## 2. PG 基线
+## 3. MySQL 机制与源码锚点
+## 4. 最小对照实验
+## MySQL 实操：命令与 SQL
+## 6. 心智迁移与生产处置
+## 7. Evidence 索引
 ```
 
-## 6. 落地步骤
+MySQL 实操章节必须自包含：连接/前置条件、完整执行步骤、关键结果判断和 cleanup/rollback；
+多会话必须标明 T1/T2 时序。文章引用 evidence，但不能用链接代替 MySQL 操作步骤。
+
+## 7. 专题最小交付
+
+```text
+<TASK_ID>_<slug>/
+├── <TASK_ID>.idx.md
+├── evidence/                 # MySQL 完整操作、双引擎关键输出、源码锚点
+└── <主题>对照文章.md
+```
+
+`verification/`、独立 Runbook、额外图表均为按需资产，不是每篇必选项。
+
+验收：
+
+```bash
+.agents/skills/mysql_study/scripts/validate_topic.sh study_record/<category>/<TASK_ID>_<slug>
+# 历史专题按旧模板回归：
+.agents/skills/mysql_study/scripts/validate_topic.sh --legacy study_record/<category>/<TASK_ID>_<slug>
+```
+
+## 8. 项目落地状态
 
 1. ✅ 安装 MySQL 8.4.10 LTS（源码编译，见 docs/environment.md）
 2. ✅ 启动 MySQL、建交叉用户 pg@localhost（双向互通已验证）
-3. ⬜ 建立 study_record 结构与学习工作流（Skill + roadmap）
-4. ⬜ 首个专题：MVCC（对照实验 + 迁移表）
+3. ✅ 建立 study_record 结构与学习工作流（Skill + roadmap）
+4. ✅ 已形成多项双引擎专题；后续默认深度快跑，并强制交付完整 MySQL 实操
