@@ -1,0 +1,16 @@
+[mysqld]
+datadir=/data/myhome/mydata/mysql-crash-redo001
+port=33311
+socket=/tmp/mysql-crash-redo001.sock
+pid-file=/data/myhome/mydata/mysql-crash-redo001/mysqld.pid
+log-error=/data/myhome/mydata/mysql-crash-redo001/error.log
+innodb-buffer-pool-size=32M
+innodb-redo-log-capacity=32M
+performance-schema=OFF
+skip-name-resolve
+max-connections=20
+character-set-server=utf8mb4
+log-bin=/data/myhome/mydata/mysql-crash-redo001/binlog
+binlog-format=ROW
+innodb-flush-log-at-trx-commit=1
+sync-binlog=1

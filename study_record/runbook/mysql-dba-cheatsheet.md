@@ -244,3 +244,15 @@ ls -lh /data/myhome/mydata/mysql/binlog.* | tail             # binlog 保留
 - DELETE 只标记删除，`.ibd` 不缩小 → 回收用 `OPTIMIZE TABLE 库.表;`（= ALTER 重建，会锁表，低峰做）
 - 清空表用 `TRUNCATE TABLE 库.表;`（重建 `.ibd` 回初始 7 页 ≈ 114688 bytes，非 0）
 - 8.4 的 `ibdata1` 不再装数据字典（字典在 `mysql.ibd`），一般不会无限膨胀
+## Crash recovery 启动判断
+
+```bash
+mysqladmin -uroot -S /tmp/mysql.sock ping
+tail -n 200 /data/myhome/mydata/mysql/error.log | \
+  grep -E 'InnoDB initialization|crash recovery|rollback|XA crash recovery|ready for connections'
+```
+
+- 按 `redo/checkpoint → recovered transaction rollback → XA → ready` 判断阶段，启动慢时不要连续重启。
+- `ready for connections` 只说明实例开放连接；随后仍需检查关键表、业务幂等键、binlog/GTID 与副本。
+- `CHECK TABLE OK` 不能证明 binlog 尾部完整；结合 `sync_binlog`、刷盘策略和 XA recovery 判断。
+- redo/checkpoint 报损坏时先保护数据目录副本；`innodb_force_recovery` 用于抢救读取，不是自动修复。

@@ -1,0 +1,27 @@
+PostgreSQL 18.4 dedicated cluster, port=54185, datadir=/data/pgdata/pg-crash-redo001
+synchronous_commit=on
+
+T1 before crash (inside open transaction):
+id  state
+1   committed-before-crash
+2   uncommitted-at-crash
+server closed the connection unexpectedly
+
+Outside T1 before crash:
+id  state
+1   committed-before-crash
+
+Fault injection:
+KILL -9 dedicated postmaster pid=3865 datadir=/data/pgdata/pg-crash-redo001
+
+After restart:
+id  state
+1   committed-before-crash
+
+Recovery log excerpt:
+2026-09-02 14:30:01.553 CST database system was interrupted; last known up at 2026-09-02 14:29:57 CST
+2026-09-02 14:30:01.589 CST redo starts at 0/177B600
+2026-09-02 14:30:01.589 CST redo done at 0/177B658
+2026-09-02 14:30:01.603 CST database system is ready to accept connections
+
+The restarted cluster was then shut down cleanly.

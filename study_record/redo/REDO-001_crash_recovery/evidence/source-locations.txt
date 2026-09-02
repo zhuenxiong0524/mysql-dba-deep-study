@@ -1,0 +1,49 @@
+Versions:
+- MySQL 8.4.10: /data/myhome/mydata/mysql-src/mysql-8.4.10
+- PostgreSQL 18.4: /data/soft/postgres/postgresql-18.4
+
+MySQL crash recovery
+
+1. Startup orchestration
+   storage/innobase/srv/srv0start.cc:1989-2085
+   - recv_recovery_from_checkpoint_start() scans from the selected checkpoint.
+   - recv_apply_hashed_log_recs() applies collected redo records to pages.
+   - recv_recovery_from_checkpoint_finish() ends redo recovery after metadata checks.
+
+2. Checkpoint is the recovery start boundary
+   storage/innobase/log/log0recv.cc:3717-3739,3839-3936
+   - recv_recovery_begin() seeds checkpoint/scanned/recovered LSN from checkpoint_lsn.
+   - recv_find_max_checkpoint() chooses a valid latest checkpoint.
+   - the code explicitly starts reading redo from checkpoint LSN upward.
+   - checkpoint_lsn != flush_lsn marks recovery as needed.
+
+3. Incomplete transactions are a separate logical rollback phase
+   storage/innobase/trx/trx0roll.cc:708-776
+   - committed recovered transactions have insert undo cleaned.
+   - non-committed, non-PREPARED transactions are rolled back using undo.
+   - PREPARED XA transactions are left for the MySQL layer to resolve.
+
+4. Dictionary recovery ordering
+   storage/innobase/srv/srv0start.cc:2381-2397
+   - dictionary transaction locks are resurrected and incomplete dictionary
+     transactions are rolled back before loading ordinary dictionary objects.
+
+PostgreSQL crash recovery
+
+1. Startup state decision
+   src/backend/access/transam/xlog.c:5463-5553, function StartupXLOG()
+   - ControlFile state distinguishes clean shutdown, interrupted shutdown,
+     interrupted recovery and production crash.
+
+2. Checkpoint and redo loop
+   src/backend/access/transam/xlogrecovery.c:1728-1773,1870-1909
+   - the record after the checkpoint/redo pointer starts replay.
+   - recovery reports redo start and end LSN and applies resource-manager records.
+   - no record after checkpoint produces "redo is not required".
+
+Interpretation:
+- Both engines repeat physical changes needed to make pages consistent.
+- PostgreSQL determines transaction visibility from replayed commit/abort state;
+  it does not run an InnoDB-style row undo rollback phase.
+- InnoDB first makes pages physically current with redo, then resolves incomplete
+  transactions with undo; XA prepared work has an additional Server-layer decision.

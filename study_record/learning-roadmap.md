@@ -100,7 +100,7 @@
 ## REDO 日志与恢复
 
 ### REDO-001 redo log 与崩溃恢复（L，P1）
-- ✅ 阶段 1（2026-09-02）：redo/undo/binlog 正常提交与回滚边界已完成；crash recovery 待计划 11
+- ✅ 完成（2026-09-02）：正常提交链及专用双引擎 kill -9 crash recovery 已完成；明确进程崩溃与断电边界
 - PG：WAL（LSN/checkpoint/full_page_writes/pg_waldump）
 - MySQL：InnoDB redo（LSN、group commit、innodb_flush_log_at_trx_commit、#innodb_redo、fuzzy checkpoint/adaptive flush）
 - 实验：kill -9 崩溃恢复两边跑，对比 WAL 与 redo 日志内容、恢复日志输出
@@ -236,7 +236,7 @@
 | 顺序 | 专题 | 任务 ID | 状态 |
 |---|---|---|---|
 | 10 | Redo/Undo/Binlog 三日志 | REDO-001 + LOG-001 | ✅ 阶段 1 完成 2026-09-02 |
-| 11 | Crash Recovery（专用实验实例） | REDO-001 | 未开始 |
+| 11 | Crash Recovery（专用实验实例） | REDO-001 | ✅ 2026-09-02 |
 | 12 | Backup/Restore/PITR | BAK-001/002 + LOG-001 | 未开始 |
 
 ### 第四阶段：能接主从生产（P0）

@@ -1,0 +1,34 @@
+MySQL 8.4.10 dedicated instance, port=33311, datadir=/data/myhome/mydata/mysql-crash-redo001
+innodb_flush_log_at_trx_commit=1, sync_binlog=1
+
+T1 before crash (inside open transaction):
+id  state
+1   committed-before-crash
+2   uncommitted-at-crash
+ERROR 2013 (HY000) at line 4: Lost connection to MySQL server during query
+
+Outside T1 before crash:
+id  state
+1   committed-before-crash
+
+Fault injection:
+KILL -9 dedicated mysqld pid=3603 datadir=/data/myhome/mydata/mysql-crash-redo001
+
+After restart:
+id  state
+1   committed-before-crash
+
+CHECK TABLE crash_lab.t_recovery:
+status OK
+
+Binary log after restart:
+binlog.000003 position 158
+
+Recovery log excerpt:
+2026-09-02T06:29:36.363060Z InnoDB initialization has started.
+2026-09-02T06:29:37.347804Z InnoDB initialization has ended.
+2026-09-02T06:29:37.638691Z Starting XA crash recovery...
+2026-09-02T06:29:37.674758Z XA crash recovery finished.
+2026-09-02T06:29:37.809146Z mysqld: ready for connections; port: 33311.
+
+The restarted instance was then shut down cleanly.
