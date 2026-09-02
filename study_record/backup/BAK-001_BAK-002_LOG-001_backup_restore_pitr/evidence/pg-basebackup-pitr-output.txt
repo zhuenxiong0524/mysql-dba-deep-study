@@ -1,0 +1,29 @@
+[SOURCE BEFORE BASE BACKUP]
+5000|1|5000|0/18D3258|0/1861650
+[SOURCE AFTER DISASTER]
+0|0/4003DE0|0/4000000
+-[ RECORD 1 ]-----+-------------------------
+archived_count    | 4
+last_archived_wal | 000000010000000000000003
+failed_count      | 0
+last_failed_wal   |
+
+archive_files=4
+[BASE BACKUP MANIFEST]
+backup successfully verified
+[RESTORED INSTANCE AT NAMED TARGET]
+6000|1000|1|11000|f
+2026-09-02 16:39:44.140 CST [22140] LOG:  restored log file "000000010000000000000002" from archive
+2026-09-02 16:39:44.165 CST [22140] LOG:  starting point-in-time recovery to "before_bad_delete"
+2026-09-02 16:39:44.179 CST [22140] LOG:  redo starts at 0/2000028
+2026-09-02 16:39:44.231 CST [22140] LOG:  restored log file "000000010000000000000003" from archive
+2026-09-02 16:39:44.259 CST [22134] LOG:  database system is ready to accept read-only connections
+2026-09-02 16:39:44.277 CST [22140] LOG:  recovery stopping at restore point "before_bad_delete", time 2026-09-02 16:39:42.657133+08
+2026-09-02 16:39:44.277 CST [22140] LOG:  redo done at 0/3032908 system usage: CPU: user: 0.01 s, system: 0.02 s, elapsed: 0.10 s
+2026-09-02 16:39:44.284 CST [22140] LOG:  selected new timeline ID: 2
+2026-09-02 16:39:44.421 CST [22134] LOG:  database system is ready to accept connections
+CLEAN SHUTDOWN COMPLETE; audit directories retained:
+/data/pgdata/plan12/source
+/data/pgdata/plan12/archive
+/data/pgdata/plan12/base-backup
+/data/pgdata/plan12/restore

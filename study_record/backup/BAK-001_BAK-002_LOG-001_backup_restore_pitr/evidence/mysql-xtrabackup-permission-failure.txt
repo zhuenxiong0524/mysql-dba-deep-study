@@ -1,0 +1,16 @@
+First full-backup attempt, MySQL 8.4.10 / XtraBackup 8.4.0-6
+
+The lab account initially had:
+BACKUP_ADMIN, PROCESS, RELOAD, LOCK TABLES, REPLICATION CLIENT
+
+Observed errors:
+1142 (42000) SELECT command denied to user 'backup_operator'@'localhost'
+for performance_schema.replication_group_members
+
+1142 (42000) SELECT command denied to user 'backup_operator'@'localhost'
+for performance_schema.keyring_component_status
+
+The backup aborted before prepare/copy-back. The script trap shut down the
+dedicated source instance. The account definition was corrected to include
+global SELECT before the clean rerun. This is an observed MySQL 8.4/PXB 8.4
+prerequisite, not a permission inferred only from documentation.

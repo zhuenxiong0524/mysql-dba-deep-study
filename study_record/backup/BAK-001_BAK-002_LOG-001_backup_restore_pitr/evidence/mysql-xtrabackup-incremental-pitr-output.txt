@@ -1,0 +1,52 @@
+[SOURCE AT INCREMENTAL BASE START]
+source_rows	MIN(id)	MAX(id)
+5000	1	13000
+File	Position	Binlog_Do_DB	Binlog_Ignore_DB	Executed_Gtid_Set
+binlog.000004	198			c112ef89-a6a8-11f1-8790-000c29951355:1-5005
+Variable_name	Value
+Innodb_redo_log_current_lsn	28312440
+[BACKUP CHAIN METADATA]
+base checkpoints:
+backup_type = full-backuped
+from_lsn = 0
+to_lsn = 28264821
+last_lsn = 28324282
+flushed_lsn = 28312440
+redo_memory = 0
+redo_frames = 0
+incremental checkpoints:
+backup_type = incremental
+from_lsn = 28264821
+to_lsn = 28324292
+last_lsn = 29911070
+flushed_lsn = 29911060
+redo_memory = 0
+redo_frames = 0
+incremental binlog boundary: file=binlog.000006 position=198 gtid=c112ef89-a6a8-11f1-8790-000c29951355:1-6005
+PITR stop before DELETE: file=binlog.000006 position=1645198
+[SOURCE AFTER DISASTER]
+source_rows_after_delete
+0
+File	Position	Binlog_Do_DB	Binlog_Ignore_DB	Executed_Gtid_Set
+binlog.000006	9544659			c112ef89-a6a8-11f1-8790-000c29951355:1-7006
+[RESTORED INCREMENTAL CHAIN BEFORE BINLOG]
+restored_rows	incremental_rows	post_backup_rows
+6000	1000	0
+@@GLOBAL.gtid_executed
+c112ef89-a6a8-11f1-8790-000c29951355:1-6005
+[RESTORED INSTANCE AFTER BINLOG PITR]
+recovered_rows	incremental_rows	recovered_post_backup_rows
+7000	1000	1000
+@@GLOBAL.gtid_executed
+c112ef89-a6a8-11f1-8790-000c29951355:1-7005
+Table	Checksum
+backup_lab.t_pitr	2411496948
+2026-09-02T16:36:24.321886+08:00 0 [Note] [MY-012980] [InnoDB] Shutdown completed; log sequence number 28324292
+2026-09-02T16:36:24.337585+08:00 0 [Note] [MY-011825] [Xtrabackup] completed OK!
+2026-09-02T16:36:28.623146+08:00 0 [Note] [MY-012980] [InnoDB] Shutdown completed; log sequence number 29911574
+2026-09-02T16:36:28.843734+08:00 0 [Note] [MY-011825] [Xtrabackup] completed OK!
+2026-09-02T16:36:30.059928+08:00 0 [Note] [MY-011825] [Xtrabackup] completed OK!
+CLEAN SHUTDOWN COMPLETE; audit directories retained:
+/data/myhome/mybackup/mysql-bak-plan12/incremental-base
+/data/myhome/mybackup/mysql-bak-plan12/incremental-1
+/data/myhome/mydata/mysql-bak-plan12-inc-restore

@@ -1,0 +1,37 @@
+Host
+Debian GNU/Linux 11 (bullseye), x86_64
+MySQL server source/build: 8.4.10
+
+Repository
+percona-release 1.0-34.generic
+pxb-84-lts enabled for Debian bullseye
+
+APT candidate
+percona-xtrabackup-84 8.4.0-6-1.bullseye
+package size 56479962 bytes
+APT-index MD5 c3155bfea7ea60fd5a43701e7decbab8
+
+Downloaded package verification
+/tmp/percona-xtrabackup-84_8.4.0-6-1.bullseye_amd64.deb: OK
+
+Installed version
+xtrabackup version 8.4.0-6 based on MySQL server 8.4.0 Linux (x86_64)
+revision id: 46a895ed
+
+Installed commands
+/usr/bin/xtrabackup
+/usr/bin/xbstream
+/usr/bin/xbcloud
+
+Installed package states
+percona-xtrabackup-84 8.4.0-6-1.bullseye install ok installed
+aria2 1.35.0-3 install ok installed
+lz4 1.9.3-2 install ok installed
+zstd 1.4.8+dfsg-2.1 install ok installed
+
+Network note
+The default repo.percona.com path initially transferred about 7 KiB/s. The
+download was stopped cleanly. Eight independent HTTP range requests against a
+public Percona mirror completed the same package; segment lengths totaled
+56479962 bytes and the reconstructed file matched the MD5 published in the
+signed APT package index before dpkg installation.

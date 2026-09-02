@@ -237,7 +237,7 @@
 |---|---|---|---|
 | 10 | Redo/Undo/Binlog 三日志 | REDO-001 + LOG-001 | ✅ 阶段 1 完成 2026-09-02 |
 | 11 | Crash Recovery（专用实验实例） | REDO-001 | ✅ 2026-09-02 |
-| 12 | Backup/Restore/PITR | BAK-001/002 + LOG-001 | 未开始 |
+| 12 | Backup/Restore/PITR | BAK-001/002 + LOG-001 | 🚧 双引擎实验完成，源码/文章进行中 |
 
 ### 第四阶段：能接主从生产（P0）
 | 顺序 | 专题 | 任务 ID | 状态 |

@@ -1,0 +1,43 @@
+[SOURCE BEFORE ONLINE BACKUP]
+rows_before	MIN(id)	MAX(id)
+2000	1	2000
+File	Position	Binlog_Do_DB	Binlog_Ignore_DB	Executed_Gtid_Set
+binlog.000002	2803882			c112ef89-a6a8-11f1-8790-000c29951355:1-2005
+Variable_name	Value
+Innodb_redo_log_current_lsn	23005923
+writer_rows_when_backup_started=40
+[SOURCE AFTER BACKUP AND WRITER COMPLETION]
+source_rows	concurrent_rows
+5000	3000
+File	Position	Binlog_Do_DB	Binlog_Ignore_DB	Executed_Gtid_Set
+binlog.000003	3048774			c112ef89-a6a8-11f1-8790-000c29951355:1-5005
+Variable_name	Value
+Innodb_redo_log_current_lsn	28257259
+[BACKUP METADATA BEFORE PREPARE]
+backup_type = full-backuped
+from_lsn = 0
+to_lsn = 21350355
+last_lsn = 24471871
+flushed_lsn = 23154755
+redo_memory = 0
+redo_frames = 0
+binlog.000003	1599	c112ef89-a6a8-11f1-8790-000c29951355:1-2830
+[BACKUP METADATA AFTER PREPARE]
+backup_type = full-prepared
+from_lsn = 0
+to_lsn = 21350355
+last_lsn = 24471871
+flushed_lsn = 23154755
+redo_memory = 0
+redo_frames = 0
+[RESTORED INSTANCE]
+restored_port	restored_rows	restored_concurrent_rows	MIN(id)	MAX(id)
+33313	2825	825	1	10825
+Table	Checksum
+backup_lab.t_pitr	1011251307
+File	Position	Binlog_Do_DB	Binlog_Ignore_DB	Executed_Gtid_Set
+binlog.000004	198			c112ef89-a6a8-11f1-8790-000c29951355:1-2830
+CLEAN SHUTDOWN COMPLETE; audit directories retained:
+/data/myhome/mydata/mysql-bak-plan12-source
+/data/myhome/mydata/mysql-bak-plan12-restore
+/data/myhome/mybackup/mysql-bak-plan12/full
