@@ -7,6 +7,7 @@ log-error=/data/myhome/mydata/mysql-crash-redo001/error.log
 innodb-buffer-pool-size=32M
 innodb-redo-log-capacity=32M
 performance-schema=OFF
+log-error-verbosity=3
 skip-name-resolve
 max-connections=20
 character-set-server=utf8mb4
@@ -14,3 +15,5 @@ log-bin=/data/myhome/mydata/mysql-crash-redo001/binlog
 binlog-format=ROW
 innodb-flush-log-at-trx-commit=1
 sync-binlog=1
+innodb-adaptive-flushing=OFF
+innodb-max-dirty-pages-pct=100

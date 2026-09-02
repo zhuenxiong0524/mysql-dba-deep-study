@@ -1,27 +1,35 @@
-PostgreSQL 18.4 dedicated cluster, port=54185, datadir=/data/pgdata/pg-crash-redo001
-synchronous_commit=on
+PostgreSQL 18.4 dedicated cluster
+port=54185 datadir=/data/pgdata/pg-crash-redo001 synchronous_commit=on
 
-T1 before crash (inside open transaction):
-id  state
-1   committed-before-crash
-2   uncommitted-at-crash
-server closed the connection unexpectedly
+[checkpoint baseline]
+Latest checkpoint location=0/177BAE0
+Latest checkpoint's REDO location=0/177BA88
+rows=1
 
-Outside T1 before crash:
-id  state
-1   committed-before-crash
+[3000 committed rows after checkpoint]
+rows=3001
+current_wal_insert_lsn=0/180C550 current_wal_flush_lsn=0/180C550
 
-Fault injection:
-KILL -9 dedicated postmaster pid=3865 datadir=/data/pgdata/pg-crash-redo001
+[T1: 1000 inserted rows, transaction remains open]
+inside transaction: rows=4001, uncommitted rows=1000
+outside transaction: rows=3001, uncommitted rows=0
+current_wal_insert_lsn=0/183BB68 current_wal_flush_lsn=0/1832000
 
-After restart:
-id  state
-1   committed-before-crash
+[fault]
+SIGKILL was sent only to the dedicated postmaster whose postmaster.pid and argv
+matched the dedicated datadir/port. T1 reported an unexpected connection close.
 
-Recovery log excerpt:
-2026-09-02 14:30:01.553 CST database system was interrupted; last known up at 2026-09-02 14:29:57 CST
-2026-09-02 14:30:01.589 CST redo starts at 0/177B600
-2026-09-02 14:30:01.589 CST redo done at 0/177B658
-2026-09-02 14:30:01.603 CST database system is ready to accept connections
+[restart result]
+rows=3001 uncommitted_rows=0 min_id=1 max_id=3999
 
-The restarted cluster was then shut down cleanly.
+[recovery log evidence]
+database system was interrupted
+redo starts at 0/177BA88
+redo done at 0/1839F50
+database system is ready to accept connections
+
+[interpretation boundary]
+The redo start is the checkpoint REDO pointer, and redo ends after the committed
+work generated following the checkpoint. No PostgreSQL log claims a row-by-row
+undo phase. The query proves visibility, not physical removal of every tuple.
+This is a process-crash experiment, not a power-loss or storage-fault experiment.

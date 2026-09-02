@@ -1,34 +1,51 @@
-MySQL 8.4.10 dedicated instance, port=33311, datadir=/data/myhome/mydata/mysql-crash-redo001
-innodb_flush_log_at_trx_commit=1, sync_binlog=1
+MySQL 8.4.10 dedicated instance
+port=33311 datadir=/data/myhome/mydata/mysql-crash-redo001
+innodb_flush_log_at_trx_commit=1 sync_binlog=1
 
-T1 before crash (inside open transaction):
-id  state
-1   committed-before-crash
-2   uncommitted-at-crash
-ERROR 2013 (HY000) at line 4: Lost connection to MySQL server during query
+[checkpoint baseline after forced dirty-page drain]
+rows=1 dirty_pages=0
+checkpoint_lsn=19361848 current_lsn=19362278 flushed_to_disk_lsn=19362278
 
-Outside T1 before crash:
-id  state
-1   committed-before-crash
+[3000 committed rows after checkpoint]
+rows=3001 dirty_pages=46
+checkpoint_lsn=19361848 current_lsn=27758472 flushed_to_disk_lsn=27758472
 
-Fault injection:
-KILL -9 dedicated mysqld pid=3603 datadir=/data/myhome/mydata/mysql-crash-redo001
+[T1: 1000 inserted rows, transaction remains open]
+inside transaction: rows=4001, uncommitted rows=1000
+outside transaction: rows=3001, uncommitted rows=0
+dirty_pages=191
+checkpoint_lsn=19361848 current_lsn=29918077 flushed_to_disk_lsn=29918077
 
-After restart:
-id  state
-1   committed-before-crash
+[fault]
+SIGKILL was sent only to the dedicated mysqld whose pid-file and argv matched
+the dedicated datadir/socket/port. T1 received ERROR 2013 Lost connection.
 
-CHECK TABLE crash_lab.t_recovery:
-status OK
+[restart result]
+rows=3001 uncommitted_rows=0 min_id=1 max_id=3999
+CHECK TABLE crash_lab.t_recovery: status OK
+checkpoint_lsn=27820925 current_lsn=29994855 flushed_to_disk_lsn=29994855
 
-Binary log after restart:
-binlog.000003 position 158
+[recovery error-log evidence]
+Log sequence number at system tablespace does not match the log sequence number
+in the redo log files.
+Starting crash recovery.
+Starting to parse redo log at lsn = 19361810, whereas checkpoint_lsn = 19361848
+and start_lsn = 19361792.
+Doing recovery: scanned up to log sequence number 24604672
+Doing recovery: scanned up to log sequence number 29847552
+Doing recovery: scanned up to log sequence number 29918077
+InnoDB initialization has ended; log sequence number 29918087.
+Starting XA crash recovery...
+XA crash recovery finished.
+Acquired lock on crash_lab/t_recovery during recovery.
+Starting in background the rollback of uncommitted transactions.
+Rolling back trx with id 1305, 1000 rows to undo.
+Rollback of trx with id 1305 completed.
+Rollback of non-prepared transactions completed.
+mysqld: ready for connections; port: 33311.
 
-Recovery log excerpt:
-2026-09-02T06:29:36.363060Z InnoDB initialization has started.
-2026-09-02T06:29:37.347804Z InnoDB initialization has ended.
-2026-09-02T06:29:37.638691Z Starting XA crash recovery...
-2026-09-02T06:29:37.674758Z XA crash recovery finished.
-2026-09-02T06:29:37.809146Z mysqld: ready for connections; port: 33311.
-
-The restarted instance was then shut down cleanly.
+[interpretation boundary]
+Checkpoint stayed at 19361848 while current/flushed LSN advanced to 29918077.
+Recovery therefore had a non-empty redo interval. The log independently proves
+that a recovered transaction with 1000 undo records was rolled back. This is a
+process-crash experiment; it does not prove power-loss or storage behavior.

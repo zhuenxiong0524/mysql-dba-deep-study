@@ -1,49 +1,51 @@
-Versions:
-- MySQL 8.4.10: /data/myhome/mydata/mysql-src/mysql-8.4.10
-- PostgreSQL 18.4: /data/soft/postgres/postgresql-18.4
+Versions
+MySQL 8.4.10: /data/myhome/mydata/mysql-src/mysql-8.4.10
+PostgreSQL 18.4: /data/soft/postgres/postgresql-18.4
 
-MySQL crash recovery
+MySQL / InnoDB startup and orchestration
+storage/innobase/handler/ha_innodb.cc:5762-5788 innobase_init_files -> srv_start
+storage/innobase/handler/ha_innodb.cc:4090-4120 restart dictionary boot and srv_start_threads
+storage/innobase/srv/srv0start.cc:1544 srv_start
+storage/innobase/srv/srv0start.cc:1989 recv_recovery_from_checkpoint_start
+storage/innobase/srv/srv0start.cc:2021-2053 recv_apply_hashed_log_recs and corruption branch
+storage/innobase/srv/srv0start.cc:2071-2085 recv_recovery_from_checkpoint_finish
+storage/innobase/srv/srv0start.cc:2383-2428 srv_dict_recover_on_restart and lock resurrection
+storage/innobase/srv/srv0start.cc:2533-2544 recovery rollback thread and MDL synchronization
 
-1. Startup orchestration
-   storage/innobase/srv/srv0start.cc:1989-2085
-   - recv_recovery_from_checkpoint_start() scans from the selected checkpoint.
-   - recv_apply_hashed_log_recs() applies collected redo records to pages.
-   - recv_recovery_from_checkpoint_finish() ends redo recovery after metadata checks.
+MySQL / InnoDB redo scan, parse, page hash, apply
+storage/innobase/log/log0recv.cc:3717-3739 initialize checkpoint/scanned/recovered LSN
+storage/innobase/log/log0recv.cc:3839-3936 select latest checkpoint and decide recovery need
+storage/innobase/log/log0recv.cc:3384-3425 scan log blocks; abrupt-end and checksum branches
+storage/innobase/log/log0recv.cc:3230 parse redo records
+storage/innobase/log/log0recv.cc:3018-3041 dispatch parsed page records into hash
+storage/innobase/log/log0recv.cc:2406-2448 recv_add_to_hash_table by space/page
+storage/innobase/log/log0recv.cc:1125-1175 recv_apply_hashed_log_recs
+storage/innobase/log/log0recv.cc:2554 recv_recover_page_func and page-LSN guard
 
-2. Checkpoint is the recovery start boundary
-   storage/innobase/log/log0recv.cc:3717-3739,3839-3936
-   - recv_recovery_begin() seeds checkpoint/scanned/recovered LSN from checkpoint_lsn.
-   - recv_find_max_checkpoint() chooses a valid latest checkpoint.
-   - the code explicitly starts reading redo from checkpoint LSN upward.
-   - checkpoint_lsn != flush_lsn marks recovery as needed.
+MySQL / InnoDB logical transaction recovery
+storage/innobase/trx/trx0trx.cc:835-1100 recovered transaction resurrection
+storage/innobase/trx/trx0roll.cc:708-776 committed cleanup, uncommitted rollback, XA PREPARED branch
+storage/innobase/trx/trx0roll.cc:784-850 trx_recovery_rollback and background thread
 
-3. Incomplete transactions are a separate logical rollback phase
-   storage/innobase/trx/trx0roll.cc:708-776
-   - committed recovered transactions have insert undo cleaned.
-   - non-committed, non-PREPARED transactions are rolled back using undo.
-   - PREPARED XA transactions are left for the MySQL layer to resolve.
+MySQL / InnoDB core structures
+storage/innobase/include/log0sys.h:520-720 log_t recovered/scanned/checkpoint LSN state
+storage/innobase/include/log0recv.h:311-326 recv_addr_t page recovery state and record list
+storage/innobase/include/log0recv.h:380-605 recv_sys_t scan/parse/apply state
 
-4. Dictionary recovery ordering
-   storage/innobase/srv/srv0start.cc:2381-2397
-   - dictionary transaction locks are resurrected and incomplete dictionary
-     transactions are rolled back before loading ordinary dictionary objects.
+PostgreSQL startup and control-state decision
+src/backend/access/transam/xlog.c:5467 StartupXLOG
+src/backend/access/transam/xlog.c:5502-5553 ControlFile state branches
+src/backend/access/transam/xlog.c:5605 InitWalRecovery
+src/backend/access/transam/xlog.c:5886 PerformWalRecovery
 
-PostgreSQL crash recovery
+PostgreSQL recovery loop and dispatch
+src/backend/access/transam/xlogrecovery.c:519 InitWalRecovery
+src/backend/access/transam/xlogrecovery.c:1671 PerformWalRecovery
+src/backend/access/transam/xlogrecovery.c:1728-1773 choose REDO pointer and first record
+src/backend/access/transam/xlogrecovery.c:1774-1893 read/apply loop and redo-done path
+src/backend/access/transam/xlogrecovery.c:1925-2020 ApplyWalRecord and rm_redo dispatch
 
-1. Startup state decision
-   src/backend/access/transam/xlog.c:5463-5553, function StartupXLOG()
-   - ControlFile state distinguishes clean shutdown, interrupted shutdown,
-     interrupted recovery and production crash.
-
-2. Checkpoint and redo loop
-   src/backend/access/transam/xlogrecovery.c:1728-1773,1870-1909
-   - the record after the checkpoint/redo pointer starts replay.
-   - recovery reports redo start and end LSN and applies resource-manager records.
-   - no record after checkpoint produces "redo is not required".
-
-Interpretation:
-- Both engines repeat physical changes needed to make pages consistent.
-- PostgreSQL determines transaction visibility from replayed commit/abort state;
-  it does not run an InnoDB-style row undo rollback phase.
-- InnoDB first makes pages physically current with redo, then resolves incomplete
-  transactions with undo; XA prepared work has an additional Server-layer decision.
+PostgreSQL core structures
+src/include/catalog/pg_control.h:104 ControlFileData
+src/include/access/xlogreader.h:59-180 DecodedXLogRecord and XLogReaderState
+src/include/access/xlog_internal.h:346-362 RmgrData rm_redo callback table

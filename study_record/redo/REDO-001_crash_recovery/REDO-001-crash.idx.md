@@ -1,6 +1,7 @@
 # REDO-001 Crash Recovery
 
-- 状态：`✅ 完成（2026-09-02）`
+- 研究级别：S
+- 状态：`✅ S 级返工完成（2026-09-02）`
 - 环境：MySQL 8.4.10 专用实例 33311；PostgreSQL 18.4 专用实例 54185
 - 故障模型：数据库主进程 `kill -9`，不是 OS 掉电或存储损坏
 
@@ -12,6 +13,7 @@
 - [x] InnoDB checkpoint → redo apply → undo rollback/XA recovery → ready 的源码链
 - [x] 专用实例隔离、强持久参数、自动化故障注入和清理护栏
 - [x] 完整 MySQL 命令、判断标准、危险范围和清理步骤
+- [x] checkpoint 后 3000 行提交 + 1000 行未提交的非空恢复区间实测
 
 ## 资产
 
