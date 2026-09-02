@@ -29,7 +29,12 @@
 | VACUUM / autovacuum + OldestXmin | Purge 线程 + oldest ReadView + History List Length | ❌ | 长快照都拖住清理；PG 留 dead heap tuples，InnoDB 留 update undo/history | MVCC-001 |
 | Heap tuple 版本链（xmin/xmax/ctid） | 聚簇记录 DB_TRX_ID/DB_ROLL_PTR + update undo 链 | 🔶 | PG 新旧完整 tuple 在 heap；InnoDB 当前记录在 PRIMARY、旧值由 undo 重建 | MVCC-001 |
 | Snapshot xmin/xmax/xip | ReadView up/low limit + m_ids | 🔶 | 都按事务 ID 边界与活跃集合判可见；PG 默认 RC 每语句快照，MySQL 默认 RR 复用 ReadView | MVCC-001 |
-| pg_locks | performance_schema.data_locks（或 innodb_status） | 🔶 | PG 系统表实时；MySQL P_S 表（本机 OFF，需另开） | ISO-001 |
+| RR 范围 FOR UPDATE 锁已命中 tuple | RR 范围锁定读的 Next-Key Lock | ❌ | PG 不锁不存在的键，插入可提交、旧快照看不到；InnoDB 锁索引记录及前方 gap，阻塞范围插入 | ISO-001 |
+| 无 Gap/Next-Key Lock | Record/Gap/Next-Key/Insert Intention Lock | ❌ | PG 行锁基于已找到 tuple；InnoDB 锁落在索引记录/间隙，范围取决于索引与扫描路径 | ISO-001 |
+| Serializable SSI + 非阻塞 SIReadLock | SERIALIZABLE 普通读转 S 锁（显式事务） | ❌ | PG 乐观跟踪 rw-conflict 并在危险结构时取消；MySQL 悲观阻塞，可能形成死锁 | ISO-001 |
+| RR snapshot isolation 写偏差 | RR consistent read 写偏差 | 🔶 | 同一 doctor 实验两边均允许不相交写集提交，跨行不变量被破坏 | ISO-001 |
+| deadlock detected（40P01） | ERROR 1213（SQLSTATE 40001） | 🔶 | 均检测等待环并取消 victim；PG 事务进入 aborted，应用都应重试整个事务 | ISO-001 |
+| pg_locks / pg_blocking_pids() | performance_schema.data_locks/data_lock_waits 或 INNODB_TRX + InnoDB status | 🔶 | PG 系统视图直接查；本机 MySQL P_S=OFF，以 INNODB_TRX/PROCESSLIST/status 兜底 | ISO-001 |
 | pg_stat_activity | SHOW PROCESSLIST / P_S.threads | 🔶 | 本机 P_S=OFF，用 PROCESSLIST + status 计数兜底 | MON-001 |
 | pg_stat_statements | P_S.events_statements_summary / slow log | 🔶 | 本机 P_S=OFF，用 slow log + performance_schema 需启用 | MON-001 |
 | pg_basebackup | xtrabackup（未装）/ CLONE | 🔶 | 本环境物理备份工具缺失，备份走 mysqldump+binlog | BAK-001/002 |

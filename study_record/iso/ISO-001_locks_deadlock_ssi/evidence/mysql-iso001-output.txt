@@ -1,0 +1,577 @@
+ISO-001 MySQL 8.4.10 raw experiment evidence
+Captured: 2026-09-01
+Instance: /tmp/mysql.sock
+Notes:
+- Two-session transcripts are labeled T1/T2.
+- In the RR range test, inspection consumed the 20s lock timeout; T2 timed out,
+  then the same insert was repeated successfully after T1 released the lock.
+- performance_schema is OFF on this instance, so INNODB_TRX and
+  SHOW ENGINE INNODB STATUS were used.
+
+===== Environment and setup [isosetup1] =====
+Note (Code 1008): Can't drop database 'mysql_iso001'; database doesn't exist
++---------+-------------------+-----------------+-------------------+
+| version | default_isolation | deadlock_detect | lock_wait_timeout |
++---------+-------------------+-----------------+-------------------+
+| 8.4.10  | REPEATABLE-READ   |               1 |                50 |
++---------+-------------------+-----------------+-------------------+
+
+
+===== RR range T1: locking read [isomyr1lock] =====
+SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT CONNECTION_ID() connection_id,@@transaction_isolation isolation;
++---------------+-----------------+
+| connection_id | isolation       |
++---------------+-----------------+
+|           186 | REPEATABLE-READ |
++---------------+-----------------+
+1 row in set (0.00 sec)
+
+mysql> SELECT * FROM range_lab WHERE id BETWEEN 10 AND 20 FOR UPDATE;
++----+--------+
+| id | note   |
++----+--------+
+| 10 | ten    |
+| 20 | twenty |
++----+--------+
+2 rows in set (0.00 sec)
+
+mysql>
+
+===== RR range T2: insert enters wait [isomyr2blocked] =====
+SET SESSION innodb_lock_wait_timeout=20;
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> START TRANSACTION;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> SELECT CONNECTION_ID() connection_id;
++---------------+
+| connection_id |
++---------------+
+|           187 |
++---------------+
+1 row in set (0.00 sec)
+
+mysql> INSERT INTO range_lab VALUES(15,'fifteen');
+
+
+===== RR range: INNODB_TRX and lock dump while blocked [isomyrangeinspect] =====
++---------------------+--------+-----------+---------------------+---------------------+--------------------------------------------+-------------------+------------------+-----------------+
+| trx_mysql_thread_id | trx_id | trx_state | trx_started         | trx_wait_started    | trx_query                                  | trx_tables_locked | trx_lock_structs | trx_rows_locked |
++---------------------+--------+-----------+---------------------+---------------------+--------------------------------------------+-------------------+------------------+-----------------+
+|                 186 |   8428 | RUNNING   | 2026-09-01 18:10:21 | NULL                | NULL                                       |                 1 |                3 |               2 |
+|                 187 |   8429 | LOCK WAIT | 2026-09-01 18:10:32 | 2026-09-01 18:10:32 | INSERT INTO range_lab VALUES(15,'fifteen') |                 1 |                2 |               1 |
++---------------------+--------+-----------+---------------------+---------------------+--------------------------------------------+-------------------+------------------+-----------------+
+TRANSACTIONS
+------------
+Trx id counter 8430
+Purge done for trx's n:o < 8428 undo n:o < 0 state: running but idle
+History list length 6
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION 421330461766440, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421330461764016, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421330461763208, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 8429, ACTIVE 14 sec inserting
+mysql tables in use 1, locked 1
+LOCK WAIT 2 lock struct(s), heap size 1128, 1 row lock(s)
+MySQL thread id 187, OS thread handle 139855146804992, query id 2592 localhost root update
+INSERT INTO range_lab VALUES(15,'fifteen')
+------- TRX HAS BEEN WAITING 14 SEC FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 23 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`range_lab` trx id 8429 lock_mode X locks gap before rec insert intention waiting
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000014; asc     ;;
+ 1: len 6; hex 0000000020d5; asc       ;;
+ 2: len 7; hex 81000000d4011d; asc        ;;
+ 3: len 6; hex 7477656e7479; asc twenty;;
+
+------------------
+TABLE LOCK table `mysql_iso001`.`range_lab` trx id 8429 lock mode IX
+RECORD LOCKS space id 23 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`range_lab` trx id 8429 lock_mode X locks gap before rec insert intention waiting
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000014; asc     ;;
+ 1: len 6; hex 0000000020d5; asc       ;;
+ 2: len 7; hex 81000000d4011d; asc        ;;
+ 3: len 6; hex 7477656e7479; asc twenty;;
+
+---TRANSACTION 8428, ACTIVE 25 sec
+3 lock struct(s), heap size 1128, 2 row lock(s)
+MySQL thread id 186, OS thread handle 139855147861760, query id 2588 localhost root
+TABLE LOCK table `mysql_iso001`.`range_lab` trx id 8428 lock mode IX
+RECORD LOCKS space id 23 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`range_lab` trx id 8428 lock_mode X locks rec but not gap
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 8000000a; asc     ;;
+ 1: len 6; hex 0000000020d5; asc       ;;
+ 2: len 7; hex 81000000d40110; asc        ;;
+ 3: len 3; hex 74656e; asc ten;;
+
+RECORD LOCKS space id 23 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`range_lab` trx id 8428 lock_mode X
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000014; asc     ;;
+ 1: len 6; hex 0000000020d5; asc       ;;
+ 2: len 7; hex 81000000d4011d; asc        ;;
+ 3: len 6; hex 7477656e7479; asc twenty;;
+
+--------
+FILE I/O
+
+
+===== RR range T1: release [isomyr1release] =====
+COMMIT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== RR range T2: lock wait timeout during inspection window [isomyr2release] =====
+ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction
+mysql> COMMIT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT * FROM range_lab ORDER BY id;
++----+--------+
+| id | note   |
++----+--------+
+| 10 | ten    |
+| 20 | twenty |
+| 30 | thirty |
++----+--------+
+3 rows in set (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== RR range: same insert succeeds after release [isomyrangeafter] =====
++----+-----------------------+
+| id | note                  |
++----+-----------------------+
+| 10 | ten                   |
+| 15 | fifteen-after-release |
+| 20 | twenty                |
+| 30 | thirty                |
++----+-----------------------+
+
+
+===== RC range T1: locking read [isomyrc1lock] =====
+SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT @@transaction_isolation isolation;
++----------------+
+| isolation      |
++----------------+
+| READ-COMMITTED |
++----------------+
+1 row in set (0.00 sec)
+
+mysql> SELECT * FROM range_lab WHERE id BETWEEN 10 AND 20 FOR UPDATE;
++----+--------+
+| id | note   |
++----+--------+
+| 10 | ten    |
+| 20 | twenty |
++----+--------+
+2 rows in set (0.00 sec)
+
+mysql>
+
+===== RC range T2: insert succeeds immediately [isomyrc2insert] =====
+START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> INSERT INTO range_lab VALUES(15,'fifteen-under-rc');
+Query OK, 1 row affected (0.00 sec)
+
+mysql> COMMIT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT * FROM range_lab ORDER BY id;
++----+------------------+
+| id | note             |
++----+------------------+
+| 10 | ten              |
+| 15 | fifteen-under-rc |
+| 20 | twenty           |
+| 30 | thirty           |
++----+------------------+
+4 rows in set (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== RC range T1: later locking read sees inserted row [isomyrc1reread] =====
+SELECT 'second RC locking read' phase,id,note FROM range_lab WHERE id BETWEEN 10 AND 20 FOR UPDATE;
++------------------------+----+------------------+
+| phase                  | id | note             |
++------------------------+----+------------------+
+| second RC locking read | 10 | ten              |
+| second RC locking read | 15 | fifteen-under-rc |
+| second RC locking read | 20 | twenty           |
++------------------------+----+------------------+
+3 rows in set (0.00 sec)
+
+mysql> COMMIT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== Deadlock T1: lock account 1 [isomydfirst1] =====
+START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT CONNECTION_ID() t1;
++-----+
+| t1  |
++-----+
+| 195 |
++-----+
+1 row in set (0.00 sec)
+
+mysql> UPDATE account_lab SET balance=balance-10 WHERE id=1;
+Query OK, 1 row affected (0.00 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql>
+
+===== Deadlock T2: lock account 2 [isomydfirst2] =====
+START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT CONNECTION_ID() t2;
++-----+
+| t2  |
++-----+
+| 196 |
++-----+
+1 row in set (0.00 sec)
+
+mysql> UPDATE account_lab SET balance=balance-20 WHERE id=2;
+Query OK, 1 row affected (0.00 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql>
+
+===== Deadlock T1: wait for account 2 [isomyd1wait] =====
+UPDATE account_lab SET balance=balance-10 WHERE id=2;
+
+
+===== Deadlock T2: victim ERROR 1213 [isomyd2victim] =====
+UPDATE account_lab SET balance=balance-20 WHERE id=1;
+ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction
+mysql>
+
+===== Deadlock T1: survives and commits [isomyd1survive] =====
+Query OK, 1 row affected (7.92 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql> COMMIT;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> SELECT * FROM account_lab ORDER BY id;
++----+---------+
+| id | balance |
++----+---------+
+|  1 |      90 |
+|  2 |      90 |
++----+---------+
+2 rows in set (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== Deadlock diagnostic: LATEST DETECTED DEADLOCK [isomydeadlockstatus] =====
+LATEST DETECTED DEADLOCK
+------------------------
+2026-09-01 18:14:22 139855164647168
+*** (1) TRANSACTION:
+TRANSACTION 8440, ACTIVE 26 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1128, 2 row lock(s), undo log entries 1
+MySQL thread id 195, OS thread handle 139855145748224, query id 2667 localhost root updating
+UPDATE account_lab SET balance=balance-10 WHERE id=2
+
+*** (1) HOLDS THE LOCK(S):
+RECORD LOCKS space id 24 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`account_lab` trx id 8440 lock_mode X locks rec but not gap
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000001; asc     ;;
+ 1: len 6; hex 0000000020f8; asc       ;;
+ 2: len 7; hex 02000000e90727; asc       ';;
+ 3: len 4; hex 8000005a; asc    Z;;
+
+
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 24 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`account_lab` trx id 8440 lock_mode X locks rec but not gap waiting
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000002; asc     ;;
+ 1: len 6; hex 0000000020f9; asc       ;;
+ 2: len 7; hex 01000000ec06a8; asc        ;;
+ 3: len 4; hex 80000050; asc    P;;
+
+
+*** (2) TRANSACTION:
+TRANSACTION 8441, ACTIVE 26 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1128, 2 row lock(s), undo log entries 1
+MySQL thread id 196, OS thread handle 139855146804992, query id 2668 localhost root updating
+UPDATE account_lab SET balance=balance-20 WHERE id=1
+
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 24 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`account_lab` trx id 8441 lock_mode X locks rec but not gap
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000002; asc     ;;
+ 1: len 6; hex 0000000020f9; asc       ;;
+ 2: len 7; hex 01000000ec06a8; asc        ;;
+ 3: len 4; hex 80000050; asc    P;;
+
+
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 24 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`account_lab` trx id 8441 lock_mode X locks rec but not gap waiting
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000001; asc     ;;
+ 1: len 6; hex 0000000020f8; asc       ;;
+ 2: len 7; hex 02000000e90727; asc       ';;
+ 3: len 4; hex 8000005a; asc    Z;;
+
+*** WE ROLL BACK TRANSACTION (2)
+------------
+TRANSACTIONS
+
+
+===== RR write-skew T1: sees two doctors [isomywread1] =====
+SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> START TRANSACTION WITH CONSISTENT SNAPSHOT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT CONNECTION_ID() t1,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
++-----+---------+
+| t1  | on_call |
++-----+---------+
+| 200 |       2 |
++-----+---------+
+1 row in set (0.03 sec)
+
+mysql>
+
+===== RR write-skew T2: sees two doctors [isomywread2] =====
+SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> START TRANSACTION WITH CONSISTENT SNAPSHOT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT CONNECTION_ID() t2,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
++-----+---------+
+| t2  | on_call |
++-----+---------+
+| 199 |       2 |
++-----+---------+
+1 row in set (0.00 sec)
+
+mysql>
+
+===== RR write-skew T1: commits own row [isomywwrite1] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=1;
+Query OK, 1 row affected (0.00 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql> COMMIT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== RR write-skew T2: commits own row [isomywwrite2] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=2;
+Query OK, 1 row affected (0.03 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql> COMMIT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== RR write-skew: invariant broken [isomywresult] =====
++----+---------+-------------------+
+| id | on_call | remaining_on_call |
++----+---------+-------------------+
+|  1 |       0 |                 0 |
+|  2 |       0 |                 0 |
++----+---------+-------------------+
+
+
+===== SERIALIZABLE T1: plain read [isomysread1] =====
+SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT CONNECTION_ID() t1,@@transaction_isolation isolation,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
++-----+--------------+---------+
+| t1  | isolation    | on_call |
++-----+--------------+---------+
+| 203 | SERIALIZABLE |       2 |
++-----+--------------+---------+
+1 row in set (0.00 sec)
+
+mysql>
+
+===== SERIALIZABLE T2: plain read [isomysread2] =====
+SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> START TRANSACTION;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT CONNECTION_ID() t2,@@transaction_isolation isolation,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
++-----+--------------+---------+
+| t2  | isolation    | on_call |
++-----+--------------+---------+
+| 204 | SERIALIZABLE |       2 |
++-----+--------------+---------+
+1 row in set (0.00 sec)
+
+mysql>
+
+===== SERIALIZABLE: both transactions hold row locks [isomystrx] =====
++---------------------+-----------------+-----------+---------------------+-------------------+------------------+-----------------+
+| trx_mysql_thread_id | trx_id          | trx_state | trx_isolation_level | trx_tables_locked | trx_lock_structs | trx_rows_locked |
++---------------------+-----------------+-----------+---------------------+-------------------+------------------+-----------------+
+|                 203 | 421330461764824 | RUNNING   | SERIALIZABLE        |                 1 |                2 |               3 |
+|                 204 | 421330461765632 | RUNNING   | SERIALIZABLE        |                 1 |                2 |               3 |
++---------------------+-----------------+-----------+---------------------+-------------------+------------------+-----------------+
++-----+-----------------+-----------+--------------+---------+-------+------------------------+-----------------------+
+| Id  | User            | Host      | db           | Command | Time  | State                  | Info                  |
++-----+-----------------+-----------+--------------+---------+-------+------------------------+-----------------------+
+|   5 | event_scheduler | localhost | NULL         | Daemon  | 30510 | Waiting on empty queue | NULL                  |
+| 203 | root            | localhost | mysql_iso001 | Sleep   |    23 |                        | NULL                  |
+| 204 | root            | localhost | mysql_iso001 | Sleep   |    22 |                        | NULL                  |
+| 206 | root            | localhost | NULL         | Query   |     0 | init                   | SHOW FULL PROCESSLIST |
++-----+-----------------+-----------+--------------+---------+-------+------------------------+-----------------------+
+
+
+===== SERIALIZABLE T1: update waits on T2 shared lock [isomys1wait] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=1;
+
+
+===== SERIALIZABLE T2: deadlock victim ERROR 1213 [isomys2dead] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=2;
+ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction
+mysql>
+
+===== SERIALIZABLE T1: survives, invariant preserved [isomys1survive] =====
+Query OK, 1 row affected (11.41 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql> COMMIT;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SELECT *,(SELECT COUNT(*) FROM doctor_lab WHERE on_call=1) remaining_on_call FROM doctor_lab ORDER BY id;
++----+---------+-------------------+
+| id | on_call | remaining_on_call |
++----+---------+-------------------+
+|  1 |       0 |                 1 |
+|  2 |       1 |                 1 |
++----+---------+-------------------+
+2 rows in set (0.00 sec)
+
+mysql> exit
+Bye
+
+
+===== SERIALIZABLE diagnostic: shared-lock cycle [isomysdeadstatus] =====
+LATEST DETECTED DEADLOCK
+------------------------
+2026-09-01 18:20:16 139855164647168
+*** (1) TRANSACTION:
+TRANSACTION 8457, ACTIVE 42 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 4 lock struct(s), heap size 1128, 4 row lock(s)
+MySQL thread id 203, OS thread handle 139855146804992, query id 2747 localhost root updating
+UPDATE doctor_lab SET on_call=0 WHERE id=1
+
+*** (1) HOLDS THE LOCK(S):
+RECORD LOCKS space id 25 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`doctor_lab` trx id 8457 lock mode S
+Record lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0
+ 0: len 8; hex 73757072656d756d; asc supremum;;
+
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000001; asc     ;;
+ 1: len 6; hex 000000002105; asc     ! ;;
+ 2: len 7; hex 010000012b0240; asc     + @;;
+ 3: len 1; hex 81; asc  ;;
+
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000002; asc     ;;
+ 1: len 6; hex 000000002105; asc     ! ;;
+ 2: len 7; hex 010000012b025f; asc     + _;;
+ 3: len 1; hex 81; asc  ;;
+
+
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 25 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`doctor_lab` trx id 8457 lock_mode X locks rec but not gap waiting
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000001; asc     ;;
+ 1: len 6; hex 000000002105; asc     ! ;;
+ 2: len 7; hex 010000012b0240; asc     + @;;
+ 3: len 1; hex 81; asc  ;;
+
+
+*** (2) TRANSACTION:
+TRANSACTION 8458, ACTIVE 41 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 4 lock struct(s), heap size 1128, 4 row lock(s)
+MySQL thread id 204, OS thread handle 139855145748224, query id 2748 localhost root updating
+UPDATE doctor_lab SET on_call=0 WHERE id=2
+
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 25 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`doctor_lab` trx id 8458 lock mode S
+Record lock, heap no 1 PHYSICAL RECORD: n_fields 1; compact format; info bits 0
+ 0: len 8; hex 73757072656d756d; asc supremum;;
+
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000001; asc     ;;
+ 1: len 6; hex 000000002105; asc     ! ;;
+ 2: len 7; hex 010000012b0240; asc     + @;;
+ 3: len 1; hex 81; asc  ;;
+
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000002; asc     ;;
+ 1: len 6; hex 000000002105; asc     ! ;;
+ 2: len 7; hex 010000012b025f; asc     + _;;
+ 3: len 1; hex 81; asc  ;;
+
+
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 25 page no 4 n bits 72 index PRIMARY of table `mysql_iso001`.`doctor_lab` trx id 8458 lock_mode X locks rec but not gap waiting
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 4; compact format; info bits 0
+ 0: len 4; hex 80000002; asc     ;;
+ 1: len 6; hex 000000002105; asc     ! ;;
+ 2: len 7; hex 010000012b025f; asc     + _;;
+ 3: len 1; hex 81; asc  ;;
+
+*** WE ROLL BACK TRANSACTION (2)
+------------
+TRANSACTIONS

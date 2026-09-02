@@ -1,0 +1,15 @@
+ISO-001 cleanup verification
+Captured: 2026-09-01
+
+Checks after cleanup:
+1) mysql_iso001 schema count
+2) @@GLOBAL.innodb_status_output_locks
+3) pg_iso001 database count
+
+Expected and observed:
+0
+0
+0
+
+All values are 0: both temporary databases are absent and the diagnostic
+global variable is restored to OFF.

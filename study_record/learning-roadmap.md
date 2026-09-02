@@ -82,11 +82,12 @@
 
 ## ISO 隔离级别与锁
 
-### ISO-001 隔离级别与锁（L，P1）
+### ISO-001 隔离级别与锁（L，P1，✅ 已完成 2026-09-01）
 - PG：RC（每语句快照）/RR（每事务快照）/Serializable(SSI)；行锁 + predicate lock；SSI 为差异点
 - MySQL：RR（默认，快照读 + next-key）/RC；record/gap/next-key/insert intention；死锁检测
-- 实验：幻读、不可重复读、写偏斜两边对照；锁等待与死锁检测日志对比（innodb_status_output_locks vs pg_locks）
-- 源码：PG heapam.c/lock.c；MySQL storage/innobase/lock/lock0lock.c、lock0prdt.cc
+- 实验：RR 范围插入、RC 对照、反序更新死锁、RR 写偏差、PG SSI/MySQL SERIALIZABLE 两边均已跑通
+- 源码：PG nodeLockRows.c/predicate.c/deadlock.c；MySQL lock0lock.h/trx0trx.h/row0sel.cc/ha_innodb.cc/lock0wait.cc
+- 产出：`study_record/iso/ISO-001_locks_deadlock_ssi/`（文章、双会话复现手册、原始输出、源码证据、验证题）
 
 ### ISO-002 在线 DDL 与 MDL（M，P1，含原 LCK-001）
 - PG：ALTER TABLE AccessExclusive 锁 + 重写；MySQL：MDL（metadata lock）+ ALGORITHM=INSTANT/INPLACE/COPY
@@ -223,7 +224,7 @@
 | 6 | 表空间/文件/容量 | ENG-002 | ✅ 已完成 2026-09-01 |
 | 7 | Clustered Index 与回表 | IDX-001 | ✅ 已完成 2026-09-01 |
 | 8 | 事务/MVCC/Undo | MVCC-001 | ✅ 已完成 2026-09-01 |
-| 9 | 锁/Gap/Next-Key/死锁 | ISO-001 | 未开始 |
+| 9 | 锁/Gap/Next-Key/死锁 | ISO-001 | ✅ 已完成 2026-09-01 |
 
 ### 第三阶段：数据出问题能恢复（P0）
 | 顺序 | 专题 | 任务 ID | 状态 |

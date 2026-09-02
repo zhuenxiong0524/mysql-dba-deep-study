@@ -1,0 +1,313 @@
+ISO-001 PostgreSQL 18.4 raw experiment evidence
+Captured: 2026-09-01
+Instance: port 54184
+Notes:
+- The experiment shape and initial rows match the MySQL side.
+- PG REPEATABLE READ keeps a stable snapshot but does not gap-lock an absent key.
+- PG SERIALIZABLE uses nonblocking SIReadLock predicates and aborts a dangerous
+  structure with serialization failure.
+
+===== Environment and setup [isosetup2] =====
+NOTICE:  database "pg_iso001" does not exist, skipping
+DROP DATABASE
+CREATE DATABASE
+CREATE TABLE
+INSERT 0 3
+CREATE TABLE
+INSERT 0 2
+CREATE TABLE
+INSERT 0 2
+                                              version
+---------------------------------------------------------------------------------------------------
+ PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+(1 row)
+
+ default_transaction_isolation
+-------------------------------
+ read committed
+(1 row)
+
+ deadlock_timeout
+------------------
+ 1s
+(1 row)
+
+
+
+===== RR range T1: SELECT FOR UPDATE [isopgr1lock] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN ISOLATION LEVEL REPEATABLE READ;
+BEGIN
+pg_iso001=*> <current_setting('transaction_isolation') isolation;
+  pid  |    isolation
+-------+-----------------
+ 60013 | repeatable read
+(1 row)
+
+pg_iso001=*> SELECT * FROM range_lab WHERE id BETWEEN 10 AND 20 FOR UPDATE;
+ id |  note
+----+--------
+ 10 | ten
+ 20 | twenty
+(2 rows)
+
+pg_iso001=*>
+
+===== RR range T2: insert succeeds immediately [isopgr2insert] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN;
+BEGIN
+pg_iso001=*> SELECT pg_backend_pid() pid;
+  pid
+-------
+ 60014
+(1 row)
+
+pg_iso001=*> INSERT INTO range_lab VALUES(15,'fifteen');
+INSERT 0 1
+pg_iso001=*> COMMIT;
+COMMIT
+pg_iso001=> SELECT * FROM range_lab ORDER BY id;
+ id |  note
+----+---------
+ 10 | ten
+ 15 | fifteen
+ 20 | twenty
+ 30 | thirty
+(4 rows)
+
+pg_iso001=>
+
+===== RR range: pg_stat_activity and pg_locks [isopgrangeinspect] =====
+  pid  |        state        | wait_event_type | wait_event | backend_xmin |                                      query
+-------+---------------------+-----------------+------------+--------------+----------------------------------------------------------------------------------
+ 60013 | idle in transaction | Client          | ClientRead |         1568 | SELECT * FROM range_lab WHERE id BETWEEN 10 AND 20 FOR UPDATE;
+ 60014 | idle                | Client          | ClientRead |              | SELECT * FROM range_lab ORDER BY id;
+ 60082 | active              |                 |            |         1568 | SELECT pid,state,wait_event_type,wait_event,backend_xmin,left(query,80) query FR
+(3 rows)
+
+  pid  |   locktype    |     mode      | granted |    relation    | page | tuple
+-------+---------------+---------------+---------+----------------+------+-------
+ 60013 | relation      | RowShareLock  | t       | range_lab      |      |
+ 60013 | relation      | RowShareLock  | t       | range_lab_pkey |      |
+ 60013 | transactionid | ExclusiveLock | t       |                |      |
+ 60013 | virtualxid    | ExclusiveLock | t       |                |      |
+(4 rows)
+
+
+
+===== RR range T1: old snapshot then fresh snapshot [isopgr1reread] =====
+< id) ids FROM range_lab WHERE id BETWEEN 10 AND 20;
+      phase       | rows_in_range |   ids
+------------------+---------------+---------
+ same RR snapshot |             2 | {10,20}
+(1 row)
+
+pg_iso001=*> COMMIT;
+COMMIT
+pg_iso001=> < id) ids FROM range_lab WHERE id BETWEEN 10 AND 20;
+       phase        | rows_in_range |    ids
+--------------------+---------------+------------
+ fresh after commit |             3 | {10,15,20}
+(1 row)
+
+pg_iso001=> \q
+
+
+===== Deadlock T1: lock account 1 [isopgdfirst1] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN;
+BEGIN
+pg_iso001=*> SELECT pg_backend_pid() t1;
+  t1
+-------
+ 60586
+(1 row)
+
+pg_iso001=*> UPDATE account_lab SET balance=balance-10 WHERE id=1;
+UPDATE 1
+pg_iso001=*>
+
+===== Deadlock T2: lock account 2 [isopgdfirst2] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN;
+BEGIN
+pg_iso001=*> SELECT pg_backend_pid() t2;
+  t2
+-------
+ 60587
+(1 row)
+
+pg_iso001=*> UPDATE account_lab SET balance=balance-20 WHERE id=2;
+UPDATE 1
+pg_iso001=*>
+
+===== Deadlock T1: wait for account 2 [isopgd1wait] =====
+UPDATE account_lab SET balance=balance-10 WHERE id=2;
+
+
+===== Deadlock T2: deadlock error [isopgd2dead] =====
+UPDATE account_lab SET balance=balance-20 WHERE id=1;
+ERROR:  deadlock detected
+DETAIL:  Process 60587 waits for ShareLock on transaction 1571; blocked by process 60586.
+Process 60586 waits for ShareLock on transaction 1572; blocked by process 60587.
+HINT:  See server log for query details.
+CONTEXT:  while updating tuple (0,3) in relation "account_lab"
+pg_iso001=!>
+
+===== Deadlock T1: survives and commits [isopgd1survive] =====
+UPDATE 1
+pg_iso001=*> COMMIT;
+COMMIT
+pg_iso001=> SELECT * FROM account_lab ORDER BY id;
+ id | balance
+----+---------
+  1 |      90
+  2 |      90
+(2 rows)
+
+pg_iso001=> \q
+
+
+===== Deadlock T2: aborted transaction requires ROLLBACK [isopgd2after] =====
+SELECT * FROM account_lab;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+pg_iso001=!> ROLLBACK;
+ROLLBACK
+pg_iso001=> SELECT * FROM account_lab ORDER BY id;
+ id | balance
+----+---------
+  1 |      90
+  2 |      90
+(2 rows)
+
+pg_iso001=> \q
+
+
+===== RR write-skew T1: sees two doctors [isopgwread1] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN ISOLATION LEVEL REPEATABLE READ;
+BEGIN
+pg_iso001=*> <1,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
+  t1   | on_call
+-------+---------
+ 60850 |       2
+(1 row)
+
+pg_iso001=*>
+
+===== RR write-skew T2: sees two doctors [isopgwread2] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN ISOLATION LEVEL REPEATABLE READ;
+BEGIN
+pg_iso001=*> <2,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
+  t2   | on_call
+-------+---------
+ 60851 |       2
+(1 row)
+
+pg_iso001=*>
+
+===== RR write-skew T1: commits own row [isopgwwrite1] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=1;
+UPDATE 1
+pg_iso001=*> COMMIT;
+COMMIT
+pg_iso001=> \q
+
+
+===== RR write-skew T2: commits own row [isopgwwrite2] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=2;
+UPDATE 1
+pg_iso001=*> COMMIT;
+COMMIT
+pg_iso001=> \q
+
+
+===== RR write-skew: invariant broken [isopgwresult] =====
+ id | on_call | remaining_on_call
+----+---------+-------------------
+  1 |       0 |                 0
+  2 |       0 |                 0
+(2 rows)
+
+
+
+===== SSI T1: sees two doctors [isopgsread1] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN ISOLATION LEVEL SERIALIZABLE;
+BEGIN
+pg_iso001=*> <n,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
+  t1   |  isolation   | on_call
+-------+--------------+---------
+ 60993 | serializable |       2
+(1 row)
+
+pg_iso001=*>
+
+===== SSI T2: sees two doctors [isopgsread2] =====
+\pset pager off
+Pager usage is off.
+pg_iso001=> BEGIN ISOLATION LEVEL SERIALIZABLE;
+BEGIN
+pg_iso001=*> <n,COUNT(*) on_call FROM doctor_lab WHERE on_call=1;
+  t2   |  isolation   | on_call
+-------+--------------+---------
+ 60994 | serializable |       2
+(1 row)
+
+pg_iso001=*>
+
+===== SSI: nonblocking SIReadLock entries [isopgssiinspect] =====
+  pid  |  locktype  |      mode       | granted |    relation     | page | tuple
+-------+------------+-----------------+---------+-----------------+------+-------
+ 60993 | relation   | AccessShareLock | t       | doctor_lab      |      |
+ 60993 | relation   | AccessShareLock | t       | doctor_lab_pkey |      |
+ 60993 | virtualxid | ExclusiveLock   | t       |                 |      |
+ 60993 | relation   | SIReadLock      | t       | doctor_lab      |      |
+ 60994 | relation   | AccessShareLock | t       | doctor_lab_pkey |      |
+ 60994 | relation   | AccessShareLock | t       | doctor_lab      |      |
+ 60994 | virtualxid | ExclusiveLock   | t       |                 |      |
+ 60994 | relation   | SIReadLock      | t       | doctor_lab      |      |
+(8 rows)
+
+
+
+===== SSI T1: writes own row [isopgswrite1] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=1;
+UPDATE 1
+pg_iso001=*>
+
+===== SSI T2: writes own row [isopgswrite2] =====
+UPDATE doctor_lab SET on_call=0 WHERE id=2;
+UPDATE 1
+pg_iso001=*>
+
+===== SSI T1: commit succeeds [isopgscommit1] =====
+COMMIT;
+COMMIT
+pg_iso001=>
+
+===== SSI T2: serialization failure at commit [isopgscommit2] =====
+COMMIT;
+ERROR:  could not serialize access due to read/write dependencies among transactions
+DETAIL:  Reason code: Canceled on identification as a pivot, during commit attempt.
+HINT:  The transaction might succeed if retried.
+pg_iso001=>
+
+===== SSI: invariant preserved [isopgsfinal1] =====
+<l=1) remaining_on_call FROM doctor_lab ORDER BY id;
+ id | on_call | remaining_on_call
+----+---------+-------------------
+  1 |       0 |                 1
+  2 |       1 |                 1
+(2 rows)
+
+pg_iso001=> \q

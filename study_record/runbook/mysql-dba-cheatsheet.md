@@ -178,9 +178,44 @@ SHOW FULL PROCESSLIST;  -- 按 trx_mysql_thread_id 找用户、来源和 SQL（P
 PG 对照：查 `pg_stat_activity.xact_start/backend_xmin` 与 `pg_stat_user_tables.n_dead_tup`；
 旧 backend_xmin 会令 VACUUM 报 `dead but not yet removable`。
 
+## 锁等待 / 死锁（ISO-001 实测）
+
+```sql
+-- 1. 先看正在执行/等待什么；Id 可与 trx_mysql_thread_id 对上
+SHOW FULL PROCESSLIST;
+
+-- 2. P_S=OFF 也可用：长事务、LOCK WAIT、持锁行数、当前 SQL
+SELECT trx_mysql_thread_id,trx_id,trx_state,trx_started,trx_wait_started,
+       trx_isolation_level,trx_rows_locked,trx_rows_modified,trx_query
+FROM information_schema.innodb_trx
+ORDER BY trx_started;
+
+-- 3. 锁记录与最近一次死锁；重点看 HOLDS / WAITING、index、gap/rec、victim
+SHOW ENGINE INNODB STATUS\G
+```
+
+若生产开启 Performance Schema：
+
+```sql
+SELECT * FROM performance_schema.data_lock_waits\G
+SELECT * FROM performance_schema.data_locks\G
+```
+
+处置顺序：
+
+1. `1205 Lock wait timeout`：找等待最久会话和 blocker，确认业务后让根因事务 COMMIT/ROLLBACK；
+   不要只调大 `innodb_lock_wait_timeout`。
+2. `1213 Deadlock found`：InnoDB 已回滚 victim；保存 `LATEST DETECTED DEADLOCK`，应用重试整个事务。
+3. 统一对象/主键访问顺序，缩短事务，避免事务中等待用户或远程调用。
+4. RR 范围 DML/`FOR UPDATE` 检查实际索引；Next-Key Lock 可能阻塞看似无关的 gap 插入。
+5. 从 PG SSI 迁移时不要直接把 MySQL 提到 SERIALIZABLE：显式事务的普通 SELECT 会变 S 锁，
+   先压测等待与死锁，并确保 1213/40001 的事务级重试。
+
+PG 对照：`pg_stat_activity + pg_blocking_pids(pid) + pg_locks`；40P01 是死锁，40001 是 SSI
+序列化失败，均回滚并重试整个事务。PG RR `FOR UPDATE` 不提供 InnoDB 式 gap 锁。
+
 ## 待填充（随专题扩展）
 
-- 长事务/锁等待/deadlock → ISO-001/MON-001
 - Buffer Pool/Redo 状态 → BUF-001/REDO-001
 - Binlog/复制状态 → LOG-001/REP-001
 - 慢 SQL → MON-001
