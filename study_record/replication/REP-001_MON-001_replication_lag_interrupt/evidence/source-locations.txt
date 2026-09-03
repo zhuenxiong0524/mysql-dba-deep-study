@@ -1,0 +1,87 @@
+REP-001 + MON-001 replication lag/interruption source anchors
+Verified: 2026-09-03
+
+MySQL 8.4.10
+source: /data/myhome/mydata/mysql-src/mysql-8.4.10
+
+sql/rpl_replica.cc:2061-2150
+  start_slave_threads: receiver and coordinator/applier lifecycle split
+sql/rpl_replica.cc:2440-2465
+  connection error classification/reporting
+sql/rpl_replica.cc:3480-3695
+  SHOW REPLICA STATUS fields, receiver/applier errors and GTID sets
+sql/rpl_replica.cc:3566-3623
+  Seconds_Behind_Source computation and NULL/zero branches
+sql/rpl_replica.cc:4878-5205
+  exec_relay_log_event executes an event, advances position, reports apply failure
+sql/rpl_replica.cc:5233-5305
+  try_to_reconnect sleeps connect_retry and retries receiver connection
+sql/rpl_replica.cc:5314-5695
+  handle_slave_io connect/request/read/queue loop and reconnect branches
+sql/rpl_replica.cc:6550-6940
+  MTS worker error propagation and coordinator stop handling
+sql/rpl_replica.cc:6972-7335
+  handle_slave_sql coordinator/applier main loop and error exits
+sql/rpl_replica.cc:7596-8225
+  queue_event persists relay events and advances Retrieved_Gtid_Set
+sql/rpl_rli.cc:550-580
+  Relay_log_info::report stores last error number/message/timestamp
+sql/rpl_mi.cc:180-210
+  Master_info initializes connect_retry and receiver state
+sql/rpl_mi.cc:490-575
+  receiver metadata repository loads connect_retry/retry_count
+sql/rpl_mi.cc:680-715
+  receiver metadata persists connection settings
+sql/rpl_rli.h:203-430
+  Relay_log_info owns relay log, applier state and error
+sql/rpl_worker.h:100-260
+  Slave_worker state/error and MTS execution ownership
+storage/perfschema/table_replication_connection_status.cc:87-105
+  SERVICE_STATE ON/OFF/CONNECTING, received set and receiver error schema
+storage/perfschema/table_replication_connection_status.cc:279-350
+  maps Master_info running/reconnect/error state into monitoring row
+storage/perfschema/table_replication_applier_status.cc:54-65
+  channel applier ON/OFF schema
+storage/perfschema/table_replication_applier_status_by_worker.cc:58-100
+  worker error, applying transaction and retry columns
+storage/perfschema/table_replication_applier_status_by_worker.cc:417-535
+  maps Relay_log_info/Slave_worker last error into monitoring rows
+
+PostgreSQL 18.4
+source: /data/soft/postgres/postgresql-18.4
+
+src/include/replication/walreceiver.h:42-130
+  WalRcvState and WalRcvData receive/write/flush progress
+src/backend/replication/walreceiverfuncs.c:150-310
+  walreceiver state inspection, RequestXLogStreaming and restart request
+src/backend/replication/walreceiver.c:152-410
+  WalReceiverMain state transition, connect failure and start-streaming path
+src/backend/replication/walreceiver.c:450-620
+  receive/write/flush/reply loop and connection-loss exit
+src/backend/replication/walreceiver.c:636-705
+  WalRcvWaitForStartPosition handles restart requests
+src/backend/replication/walreceiver.c:819-1055
+  process WAL message, write and flush LSN advancement
+src/backend/access/transam/xlogrecovery.c:1671-1900
+  PerformWalRecovery replay loop independent of walreceiver
+src/backend/access/transam/xlogrecovery.c:2947-2985
+  recoveryPausesHere waits while replay is paused
+src/backend/access/transam/xlogrecovery.c:3112-3142
+  SetRecoveryPause requested/paused/not-paused transitions
+src/backend/access/transam/xlogrecovery.c:3895-3945
+  startup requests streaming and observes walreceiver flush LSN
+src/backend/executor/execMain.c:160-175
+  executor invokes ExecCheckXactReadOnly for write-capable plans
+src/backend/executor/execMain.c:802-825
+  ExecCheckXactReadOnly rejects non-temporary writes
+src/backend/tcop/utility.c:398-414
+  PreventCommandIfReadOnly emits SQLSTATE 25006
+src/backend/replication/walsender.c:2423-2525
+  primary records standby write/flush/apply feedback
+src/backend/replication/walsender.c:2806-3110
+  WalSndLoop catchup/streaming/wait behavior
+
+PG baseline inspected
+/data/myfuture/src/func/repl/Physical_Replication_物理复制流程.md
+/data/myfuture/src/func/repl/Physical_Replication_Failover_主备切换流程.md
+/data/myfuture/src/func/repl/Sync_vs_Async_Replication_同步与异步复制对比.md

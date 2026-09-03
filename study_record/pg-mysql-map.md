@@ -46,6 +46,8 @@
 | WAL PITR（restore_command） | binlog + mysqlbinlog PITR | 🔶 | PG 回放物理 WAL；MySQL 回放逻辑 binlog，必须从物理备份记录的 file/position 或 GTID 连续衔接 | BAK-001/002 + LOG-001 |
 | walsender → walreceiver → startup replay | Binlog_sender → receiver → relay log → applier | ❌ | PG 传物理 WAL/LSN；MySQL 传 binlog event/GTID；两边的接收进度都不等于应用进度 | REP-001 |
 | timeline + LSN streaming startpoint | `SOURCE_AUTO_POSITION=1` + GTID set | ❌ | MySQL 以已接收/已执行 GTID 集合求缺失事务，但 GTID 集合不包含事务内容，所需 binlog 被清除仍会失败 1236 | REP-001 |
+| walreceiver receive/flush LSN vs startup replay LSN | Retrieved GTID vs Executed GTID | 🔶 | 两者都要区分传输与应用；单一延迟秒数无法定位，接收领先时查询仍可能是旧数据 | REP-001 + MON-001 |
+| physical standby recovery read-only | `read_only` / `super_read_only` replica | ❌ | PG standby 普通表写入直接报 25006；MySQL replica 若未正确限制高权限写入，可制造 1062 等逻辑应用冲突 | REP-001 + MON-001 |
 | EXPLAIN ANALYZE | EXPLAIN ANALYZE / EXPLAIN TREE | ✅ | 概念类似，格式与字段不同 | OPT-001 |
 | 日志：postgresql.log | error.log + slow_query_log + general_log | 🔶 | error log 最核心；slow log 默认关 | MON-001 |
 | 参数持久化 ALTER SYSTEM | SET PERSIST / SET PERSIST_ONLY | 🔶 | 均写盘（auto.conf vs mysqld-auto.cnf）；PG reload/pending_restart，MySQL 静态参数报 1238 | ENV-006 |

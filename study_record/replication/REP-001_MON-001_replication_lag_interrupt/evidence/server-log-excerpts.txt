@@ -1,0 +1,22 @@
+REP-001 + MON-001 server log excerpts
+Observed: 2026-09-03
+
+MySQL source outage/reconnect:
+Replica connection status reported CONNECTING, error 2003, connection refused,
+attempt 3/10, SOURCE_CONNECT_RETRY=1 second.
+Replica error log later reported replication resumed at binlog.000002 position 3231
+and Starting GTID-based replication with the same source UUID.
+
+MySQL applier divergence:
+Worker 1 failed transaction 93c8a353-a738-11f1-8503-000c29951355:7.
+Write_rows on rep_lab.events failed with Duplicate entry '1000' for PRIMARY,
+Error_code 1062 / HA_ERR_FOUND_DUPP_KEY, source binlog.000003 end_log_pos 2229.
+
+PostgreSQL primary outage/reconnect:
+Standby walreceiver reported connection refused to 127.0.0.1:54341.
+After primary restart it reported started streaming WAL from primary at
+0/4000000 on timeline 1.
+
+PostgreSQL replay lag:
+Standby logged recovery has paused while pg_stat_wal_receiver remained
+streaming; receive LSN 0/4000000, replay LSN 0/3000000.

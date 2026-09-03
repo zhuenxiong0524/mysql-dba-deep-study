@@ -244,6 +244,33 @@ SHOW REPLICA STATUS\G
 - 不要把 `Seconds_Behind_Source=0` 当唯一健康指标；同时看两线程状态、最后错误、集合差和业务校验。
 - MySQL 8.4 不再接受 `source_info_repository` / `relay_log_info_repository` 旧配置；复制元数据已使用系统表。
 
+复制中断按层定位（REP-001 + MON-001）：
+
+```sql
+-- Transport：OFF/CONNECTING、2003 等属于 receiver/source/network
+SELECT SERVICE_STATE,LAST_ERROR_NUMBER,LAST_ERROR_MESSAGE,
+       RECEIVED_TRANSACTION_SET
+FROM performance_schema.replication_connection_status\G
+
+-- Apply：connection ON 但 worker 有错误，属于 relay→apply
+SELECT WORKER_ID,SERVICE_STATE,LAST_ERROR_NUMBER,LAST_ERROR_MESSAGE,
+       APPLYING_TRANSACTION
+FROM performance_schema.replication_applier_status_by_worker
+WHERE LAST_ERROR_NUMBER <> 0 OR SERVICE_STATE='OFF'\G
+
+-- 已接收但未执行的 GTID
+SELECT GTID_SUBTRACT(
+  (SELECT RECEIVED_TRANSACTION_SET
+   FROM performance_schema.replication_connection_status
+   WHERE CHANNEL_NAME=''),
+  @@GLOBAL.gtid_executed) AS received_not_executed;
+```
+
+- Source 短时不可达时 receiver 可处于 `CONNECTING`，applier 仍可能是 ON；恢复后用有界 GTID wait 验证续接。
+- Worker 1062 时不要直接 skip：先定位失败 GTID/binlog event，对照 source 权威行，确认分歧范围；无法证明时重建 replica。
+- 修复副本数据前先停 SQL_THREAD，并评估 `sql_log_bin=0` 对下游拓扑的影响；修复后验证业务行、Executed GTID 和 worker error。
+- `Seconds_Behind_Source` 为 0/NULL 都不能单独证明健康，必须结合线程状态、错误、GTID 差和 relay log 空间。
+
 ## 磁盘空间 / 表大小（ENG-002 实测）
 
 ```sql
