@@ -48,7 +48,7 @@
 | timeline + LSN streaming startpoint | `SOURCE_AUTO_POSITION=1` + GTID set | ❌ | MySQL 以已接收/已执行 GTID 集合求缺失事务，但 GTID 集合不包含事务内容，所需 binlog 被清除仍会失败 1236 | REP-001 |
 | walreceiver receive/flush LSN vs startup replay LSN | Retrieved GTID vs Executed GTID | 🔶 | 两者都要区分传输与应用；单一延迟秒数无法定位，接收领先时查询仍可能是旧数据 | REP-001 + MON-001 |
 | physical standby recovery read-only | `read_only` / `super_read_only` replica | ❌ | PG standby 普通表写入直接报 25006；MySQL replica 若未正确限制高权限写入，可制造 1062 等逻辑应用冲突 | REP-001 + MON-001 |
-| EXPLAIN ANALYZE | EXPLAIN ANALYZE / EXPLAIN TREE | ✅ | 概念类似，格式与字段不同 | OPT-001 |
+| EXPLAIN ANALYZE / BUFFERS / WAL | EXPLAIN ANALYZE / TREE + optimizer_trace | ⚠️ | 两边 ANALYZE 都执行受支持查询；PG 原生显示 BUFFERS/WAL，MySQL trace 补候选路径；MySQL 8.4.10 本次单表 UPDATE 不支持 iterator ANALYZE | OPT-001 |
 | 日志：postgresql.log | error.log + slow_query_log + general_log | 🔶 | error log 最核心；slow log 默认关 | MON-001 |
 | 参数持久化 ALTER SYSTEM | SET PERSIST / SET PERSIST_ONLY | 🔶 | 均写盘（auto.conf vs mysqld-auto.cnf）；PG reload/pending_restart，MySQL 静态参数报 1238 | ENV-006 |
 | 连接池 pgbouncer | thread_cache_size / 连接池 | 🔶 | PG 环境已有 pgbouncer；MySQL 学习实例单实例 | CONN-001 |

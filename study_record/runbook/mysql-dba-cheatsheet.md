@@ -144,6 +144,17 @@ SELECT VARIABLE_NAME, VARIABLE_SOURCE, VARIABLE_PATH, SET_TIME, SET_USER
 SHOW INDEX FROM db_name.table_name;
 EXPLAIN SELECT ...;          -- Extra=Using index：投影被覆盖
 EXPLAIN ANALYZE SELECT ...;  -- TREE 中 Covering index lookup：覆盖
+
+# 执行计划排障：先静态、后实际；ANALYZE 会执行受支持的查询
+EXPLAIN FORMAT=TREE SELECT ...;
+EXPLAIN FORMAT=JSON SELECT ...;
+EXPLAIN ANALYZE SELECT ...;  -- rows 必须结合 loops 阅读
+
+SET optimizer_trace='enabled=on', optimizer_trace_max_mem_size=1048576;
+SELECT ...;                  -- 目标 SQL
+SELECT TRACE,MISSING_BYTES_BEYOND_MAX_MEM_SIZE
+FROM information_schema.optimizer_trace\G
+SET optimizer_trace='enabled=off';
 ```
 
 判断规则：

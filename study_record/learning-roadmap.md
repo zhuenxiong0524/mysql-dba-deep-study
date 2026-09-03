@@ -134,7 +134,7 @@
 
 ## OPT 优化器
 
-### OPT-001 统计信息与执行计划对照（M，P1）
+### OPT-001 统计信息与执行计划对照（S，P1，✅ 2026-09-03）
 - PG：ANALYZE + 代价模型 + EXPLAIN (ANALYZE, BUFFERS)；MySQL：ANALYZE TABLE + 持久化统计（mysql.innodb_table_stats）+ EXPLAIN ANALYZE/TREE
 - 实验：同表同数据量同 SQL 两边计划对照（join 顺序、索引选择）；统计信息刷新机制
 - 源码：PG src/backend/commands/analyze.c；MySQL sql/opt_explain.cc、storage/innobase/dict/dict0stats.cc
@@ -248,7 +248,7 @@
 ### 第五阶段：能处理性能故障（P0/P1）
 | 顺序 | 专题 | 任务 ID | 状态 |
 |---|---|---|---|
-| 15 | Optimizer/EXPLAIN | OPT-001 | 未开始 |
+| 15 | Optimizer/EXPLAIN | OPT-001 | ✅ 已完成（2026-09-03） |
 | 16 | 组合索引与统计信息 | OPT-001 + IDX-001 | 未开始 |
 | 17 | Performance Schema / 慢 SQL | MON-001（注意：本机 P_S=OFF） | 未开始 |
 | 18 | 连接数/长事务/CPU/IO/磁盘 | CONN-001 + MON-001 + DR-001 | 未开始 |

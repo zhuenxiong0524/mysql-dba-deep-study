@@ -1,0 +1,447 @@
+[VERSION AND SETUP]
+8.4.10	33341	index_merge=on,index_merge_union=on,index_merge_sort_union=on,index_merge_intersection=on,engine_condition_pushdown=on,index_condition_pushdown=on,mrr=on,mrr_cost_based=on,block_nested_loop=on,batched_key_access=off,materialization=on,semijoin=on,loosescan=on,firstmatch=on,duplicateweedout=on,subquery_materialization_cost_based=on,use_index_extensions=on,condition_fanout_filter=on,derived_merge=on,use_invisible_indexes=off,skip_scan=on,hash_join=on,subquery_to_derived=off,prefer_ordering_index=on,hypergraph_optimizer=off,derived_condition_pushdown=on,hash_set_operations=on	TRADITIONAL
+Table	Op	Msg_type	Msg_text
+opt_lab.customers	analyze	status	OK
+opt_lab.orders	analyze	status	OK
+[TABLE COUNTS]
+1000
+20000	100
+[BEHAVIOR: SARGABLE PRIMARY KEY]
+EXPLAIN
+-> Rows fetched before execution  (cost=0..0 rows=1)\n
+EXPLAIN
+-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=180e-6..221e-6 rows=1 loops=1)\n
+[BEHAVIOR: NON-SARGABLE EXPRESSION]
+EXPLAIN
+-> Filter: ((orders.id + 0) = 19999)  (cost=1998 rows=19734)\n    -> Table scan on orders  (cost=1998 rows=19734)\n
+EXPLAIN
+-> Filter: ((orders.id + 0) = 19999)  (cost=1998 rows=19734) (actual time=8.11..8.11 rows=1 loops=1)\n    -> Table scan on orders  (cost=1998 rows=19734) (actual time=0.317..5.61 rows=20000 loops=1)\n
+[JOIN ORDER AND ITERATORS]
+EXPLAIN
+{\n  "query_block": {\n    "select_id": 1,\n    "cost_info": {\n      "query_cost": "78.44"\n    },\n    "grouping_operation": {\n      "using_temporary_table": true,\n      "using_filesort": false,\n      "nested_loop": [\n        {\n          "table": {\n            "table_name": "c",\n            "access_type": "range",\n            "possible_keys": [\n              "PRIMARY",\n              "idx_region"\n            ],\n            "key": "PRIMARY",\n            "used_key_parts": [\n              "id"\n            ],\n            "key_length": "4",\n            "rows_examined_per_scan": 11,\n            "rows_produced_per_join": 11,\n            "filtered": "100.00",\n            "cost_info": {\n              "read_cost": "1.36",\n              "eval_cost": "1.10",\n              "prefix_cost": "2.46",\n              "data_read_per_join": "440"\n            },\n            "used_columns": [\n              "id",\n              "region"\n            ],\n            "attached_condition": "(`opt_lab`.`c`.`id` between 10 and 20)"\n          }\n        },\n        {\n          "table": {\n            "table_name": "o",\n            "access_type": "ref",\n            "possible_keys": [\n              "idx_customer"\n            ],\n            "key": "idx_customer",\n            "used_key_parts": [\n              "customer_id"\n            ],\n            "key_length": "4",\n            "ref": [\n              "opt_lab.c.id"\n            ],\n            "rows_examined_per_scan": 19,\n            "rows_produced_per_join": 217,\n            "filtered": "100.00",\n            "cost_info": {\n              "read_cost": "54.27",\n              "eval_cost": "21.71",\n              "prefix_cost": "78.44",\n              "data_read_per_join": "15K"\n            },\n            "used_columns": [\n              "id",\n              "customer_id",\n              "amount"\n            ]\n          }\n        }\n      ]\n    }\n  }\n}
+EXPLAIN
+-> Table scan on <temporary>  (actual time=0.748..0.75 rows=10 loops=1)\n    -> Aggregate using temporary table  (actual time=0.747..0.747 rows=10 loops=1)\n        -> Nested loop inner join  (cost=78.4 rows=217) (actual time=0.0945..0.37 rows=220 loops=1)\n            -> Filter: (c.id between 10 and 20)  (cost=2.46 rows=11) (actual time=0.0275..0.0331 rows=11 loops=1)\n                -> Index range scan on c using PRIMARY over (10 <= id <= 20)  (cost=2.46 rows=11) (actual time=0.0197..0.0229 rows=11 loops=1)\n            -> Index lookup on o using idx_customer (customer_id=c.id)  (cost=5.11 rows=19.7) (actual time=0.0265..0.0288 rows=20 loops=11)\n
+[EXPLAIN DOES NOT RUN; ANALYZE RUNS SLEEP]
+EXPLAIN
+-> Filter: ((orders.id <= 10) and (sleep(0.01) = 0))  (cost=2.26 rows=10)\n    -> Covering index range scan on orders using PRIMARY over (id <= 10)  (cost=2.26 rows=10)\n
+EXPLAIN
+-> Filter: ((orders.id <= 10) and (sleep(0.01) = 0))  (cost=2.26 rows=10) (actual time=11..105 rows=10 loops=1)\n    -> Covering index range scan on orders using PRIMARY over (id <= 10)  (cost=2.26 rows=10) (actual time=0.0143..0.056 rows=10 loops=1)\n
+[PATH: OPTIMIZER TRACE SARGABLE]
+COUNT(*)
+20
+*************************** 1. row ***************************
+TRACE: {
+  "steps": [
+    {
+      "join_preparation": {
+        "select#": 1,
+        "steps": [
+          {
+            "expanded_query": "/* select#1 */ select count(0) AS `COUNT(*)` from `orders` where (`orders`.`customer_id` = 42)"
+          }
+        ]
+      }
+    },
+    {
+      "join_optimization": {
+        "select#": 1,
+        "steps": [
+          {
+            "condition_processing": {
+              "condition": "WHERE",
+              "original_condition": "(`orders`.`customer_id` = 42)",
+              "steps": [
+                {
+                  "transformation": "equality_propagation",
+                  "resulting_condition": "multiple equal(42, `orders`.`customer_id`)"
+                },
+                {
+                  "transformation": "constant_propagation",
+                  "resulting_condition": "multiple equal(42, `orders`.`customer_id`)"
+                },
+                {
+                  "transformation": "trivial_condition_removal",
+                  "resulting_condition": "multiple equal(42, `orders`.`customer_id`)"
+                }
+              ]
+            }
+          },
+          {
+            "substitute_generated_columns": {
+            }
+          },
+          {
+            "table_dependencies": [
+              {
+                "table": "`orders`",
+                "row_may_be_null": false,
+                "map_bit": 0,
+                "depends_on_map_bits": [
+                ]
+              }
+            ]
+          },
+          {
+            "ref_optimizer_key_uses": [
+              {
+                "table": "`orders`",
+                "field": "customer_id",
+                "equals": "42",
+                "null_rejecting": true
+              }
+            ]
+          },
+          {
+            "rows_estimation": [
+              {
+                "table": "`orders`",
+                "range_analysis": {
+                  "table_scan": {
+                    "rows": 19734,
+                    "cost": 1999.75
+                  },
+                  "potential_range_indexes": [
+                    {
+                      "index": "PRIMARY",
+                      "usable": false,
+                      "cause": "not_applicable"
+                    },
+                    {
+                      "index": "idx_customer",
+                      "usable": true,
+                      "key_parts": [
+                        "customer_id",
+                        "id"
+                      ]
+                    },
+                    {
+                      "index": "idx_status",
+                      "usable": false,
+                      "cause": "not_applicable"
+                    }
+                  ],
+                  "best_covering_index_scan": {
+                    "index": "idx_customer",
+                    "cost": 1978.46,
+                    "chosen": true
+                  },
+                  "setup_range_conditions": [
+                  ],
+                  "group_index_skip_scan": {
+                    "chosen": false,
+                    "cause": "not_group_by_or_distinct"
+                  },
+                  "skip_scan_range": {
+                    "potential_skip_scan_indexes": [
+                      {
+                        "index": "idx_customer",
+                        "usable": false,
+                        "cause": "no_range_predicate"
+                      }
+                    ]
+                  },
+                  "analyzing_range_alternatives": {
+                    "range_scan_alternatives": [
+                      {
+                        "index": "idx_customer",
+                        "ranges": [
+                          "customer_id = 42"
+                        ],
+                        "index_dives_for_eq_ranges": true,
+                        "rowid_ordered": true,
+                        "using_mrr": false,
+                        "index_only": true,
+                        "in_memory": 1,
+                        "rows": 20,
+                        "cost": 2.26463,
+                        "chosen": true
+                      }
+                    ],
+                    "analyzing_roworder_intersect": {
+                      "usable": false,
+                      "cause": "too_few_roworder_scans"
+                    }
+                  },
+                  "chosen_range_access_summary": {
+                    "range_access_plan": {
+                      "type": "range_scan",
+                      "index": "idx_customer",
+                      "rows": 20,
+                      "ranges": [
+                        "customer_id = 42"
+                      ]
+                    },
+                    "rows_for_plan": 20,
+                    "cost_for_plan": 2.26463,
+                    "chosen": true
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "considered_execution_plans": [
+              {
+                "plan_prefix": [
+                ],
+                "table": "`orders`",
+                "best_access_path": {
+                  "considered_access_paths": [
+                    {
+                      "access_type": "ref",
+                      "index": "idx_customer",
+                      "rows": 20,
+                      "cost": 2.25463,
+                      "chosen": true
+                    },
+                    {
+                      "access_type": "range",
+                      "range_details": {
+                        "used_index": "idx_customer"
+                      },
+                      "chosen": false,
+                      "cause": "heuristic_index_cheaper"
+                    }
+                  ]
+                },
+                "condition_filtering_pct": 100,
+                "rows_for_plan": 20,
+                "cost_for_plan": 2.25463,
+                "chosen": true
+              }
+            ]
+          },
+          {
+            "attaching_conditions_to_tables": {
+              "original_condition": "(`orders`.`customer_id` = 42)",
+              "attached_conditions_computation": [
+              ],
+              "attached_conditions_summary": [
+                {
+                  "table": "`orders`",
+                  "attached": "(`orders`.`customer_id` = 42)"
+                }
+              ]
+            }
+          },
+          {
+            "optimizing_distinct_group_by_order_by": {
+            }
+          },
+          {
+            "finalizing_table_conditions": [
+              {
+                "table": "`orders`",
+                "original_table_condition": "(`orders`.`customer_id` = 42)",
+                "final_table_condition   ": null
+              }
+            ]
+          },
+          {
+            "refine_plan": [
+              {
+                "table": "`orders`"
+              }
+            ]
+          },
+          {
+            "considering_tmp_tables": [
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "join_execution": {
+        "select#": 1,
+        "steps": [
+        ]
+      }
+    }
+  ]
+}
+[PATH: OPTIMIZER TRACE NON-SARGABLE]
+COUNT(*)
+20
+*************************** 1. row ***************************
+TRACE: {
+  "steps": [
+    {
+      "join_preparation": {
+        "select#": 1,
+        "steps": [
+          {
+            "expanded_query": "/* select#1 */ select count(0) AS `COUNT(*)` from `orders` where ((`orders`.`customer_id` + 0) = 42)"
+          }
+        ]
+      }
+    },
+    {
+      "join_optimization": {
+        "select#": 1,
+        "steps": [
+          {
+            "condition_processing": {
+              "condition": "WHERE",
+              "original_condition": "((`orders`.`customer_id` + 0) = 42)",
+              "steps": [
+                {
+                  "transformation": "equality_propagation",
+                  "resulting_condition": "((`orders`.`customer_id` + 0) = 42)"
+                },
+                {
+                  "transformation": "constant_propagation",
+                  "resulting_condition": "((`orders`.`customer_id` + 0) = 42)"
+                },
+                {
+                  "transformation": "trivial_condition_removal",
+                  "resulting_condition": "((`orders`.`customer_id` + 0) = 42)"
+                }
+              ]
+            }
+          },
+          {
+            "substitute_generated_columns": {
+            }
+          },
+          {
+            "table_dependencies": [
+              {
+                "table": "`orders`",
+                "row_may_be_null": false,
+                "map_bit": 0,
+                "depends_on_map_bits": [
+                ]
+              }
+            ]
+          },
+          {
+            "ref_optimizer_key_uses": [
+            ]
+          },
+          {
+            "rows_estimation": [
+              {
+                "table": "`orders`",
+                "range_analysis": {
+                  "table_scan": {
+                    "rows": 19734,
+                    "cost": 1999.75
+                  },
+                  "potential_range_indexes": [
+                    {
+                      "index": "PRIMARY",
+                      "usable": false,
+                      "cause": "not_applicable"
+                    },
+                    {
+                      "index": "idx_customer",
+                      "usable": true,
+                      "key_parts": [
+                        "customer_id",
+                        "id"
+                      ]
+                    },
+                    {
+                      "index": "idx_status",
+                      "usable": false,
+                      "cause": "not_applicable"
+                    }
+                  ],
+                  "best_covering_index_scan": {
+                    "index": "idx_customer",
+                    "cost": 1978.46,
+                    "chosen": true
+                  },
+                  "setup_range_conditions": [
+                  ],
+                  "group_index_skip_scan": {
+                    "chosen": false,
+                    "cause": "not_group_by_or_distinct"
+                  },
+                  "skip_scan_range": {
+                    "chosen": false,
+                    "cause": "disjuntive_predicate_present"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "considered_execution_plans": [
+              {
+                "plan_prefix": [
+                ],
+                "table": "`orders`",
+                "best_access_path": {
+                  "considered_access_paths": [
+                    {
+                      "rows_to_scan": 19734,
+                      "access_type": "scan",
+                      "resulting_rows": 19734,
+                      "cost": 1997.65,
+                      "chosen": true
+                    }
+                  ]
+                },
+                "condition_filtering_pct": 100,
+                "rows_for_plan": 19734,
+                "cost_for_plan": 1997.65,
+                "chosen": true
+              }
+            ]
+          },
+          {
+            "attaching_conditions_to_tables": {
+              "original_condition": "((`orders`.`customer_id` + 0) = 42)",
+              "attached_conditions_computation": [
+              ],
+              "attached_conditions_summary": [
+                {
+                  "table": "`orders`",
+                  "attached": "((`orders`.`customer_id` + 0) = 42)"
+                }
+              ]
+            }
+          },
+          {
+            "optimizing_distinct_group_by_order_by": {
+            }
+          },
+          {
+            "finalizing_table_conditions": [
+              {
+                "table": "`orders`",
+                "original_table_condition": "((`orders`.`customer_id` + 0) = 42)",
+                "final_table_condition   ": "((`orders`.`customer_id` + 0) = 42)"
+              }
+            ]
+          },
+          {
+            "refine_plan": [
+              {
+                "table": "`orders`"
+              }
+            ]
+          },
+          {
+            "considering_tmp_tables": [
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "join_execution": {
+        "select#": 1,
+        "steps": [
+        ]
+      }
+    }
+  ]
+}
+[DML SAFETY: EXPLAIN ANALYZE EXECUTES, ROLLBACK RESTORES]
+1.70
+-> <not executable by iterator executor>\n
+1.70
+1.70

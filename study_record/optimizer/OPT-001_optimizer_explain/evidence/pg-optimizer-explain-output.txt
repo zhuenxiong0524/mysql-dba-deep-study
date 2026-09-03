@@ -1,0 +1,123 @@
+[VERSION AND SETUP]
+PostgreSQL 18.4 on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+54351|32MB
+[TABLE COUNTS]
+1000
+20000|100
+[BEHAVIOR: SARGABLE PRIMARY KEY]
+                                                          QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using orders_pkey on public.orders  (cost=0.29..8.30 rows=1 width=28) (actual time=0.031..0.033 rows=1.00 loops=1)
+   Output: id, customer_id, status, amount, created_at
+   Index Cond: (orders.id = 19999)
+   Index Searches: 1
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=104
+ Planning Time: 1.285 ms
+ Execution Time: 0.205 ms
+(9 rows)
+
+[BEHAVIOR: NON-SARGABLE EXPRESSION]
+                                                  QUERY PLAN
+---------------------------------------------------------------------------------------------------------------
+ Seq Scan on public.orders  (cost=0.00..448.00 rows=100 width=28) (actual time=9.903..9.905 rows=1.00 loops=1)
+   Output: id, customer_id, status, amount, created_at
+   Filter: ((orders.id + 0) = 19999)
+   Rows Removed by Filter: 19999
+   Buffers: shared hit=148
+ Planning:
+   Buffers: shared hit=100
+ Planning Time: 0.736 ms
+ Execution Time: 9.994 ms
+(9 rows)
+
+[JOIN ORDER AND PLAN NODES]
+                                                                        QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=411.00..411.09 rows=7 width=43) (actual time=9.918..9.931 rows=10.00 loops=1)
+   Output: c.region, count(*), sum(o.amount)
+   Group Key: c.region
+   Batches: 1  Memory Usage: 32kB
+   Buffers: shared hit=151
+   ->  Hash Join  (cost=8.63..409.35 rows=220 width=9) (actual time=0.070..9.645 rows=220.00 loops=1)
+         Output: c.region, o.amount
+         Inner Unique: true
+         Hash Cond: (o.customer_id = c.id)
+         Buffers: shared hit=151
+         ->  Seq Scan on public.orders o  (cost=0.00..348.00 rows=20000 width=10) (actual time=0.014..3.656 rows=20000.00 loops=1)
+               Output: o.id, o.customer_id, o.status, o.amount, o.created_at
+               Buffers: shared hit=148
+         ->  Hash  (cost=8.49..8.49 rows=11 width=7) (actual time=0.040..0.041 rows=11.00 loops=1)
+               Output: c.region, c.id
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               Buffers: shared hit=3
+               ->  Index Scan using customers_pkey on public.customers c  (cost=0.28..8.49 rows=11 width=7) (actual time=0.019..0.027 rows=11.00 loops=1)
+                     Output: c.region, c.id
+                     Index Cond: ((c.id >= 10) AND (c.id <= 20))
+                     Index Searches: 1
+                     Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=266
+ Planning Time: 1.945 ms
+ Execution Time: 10.128 ms
+(26 rows)
+
+[EXPLAIN DOES NOT RUN; ANALYZE RUNS SLEEP]
+                                      QUERY PLAN
+---------------------------------------------------------------------------------------
+ Index Only Scan using orders_pkey on public.orders  (cost=0.29..8.59 rows=1 width=4)
+   Output: id
+   Index Cond: (orders.id <= 10)
+   Filter: (pg_sleep(((((orders.id * 0))::numeric + 0.01))::double precision) IS NULL)
+(4 rows)
+
+                                                              QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using orders_pkey on public.orders  (cost=0.29..8.59 rows=1 width=4) (actual time=168.114..168.115 rows=0.00 loops=1)
+   Output: id
+   Index Cond: (orders.id <= 10)
+   Filter: (pg_sleep(((((orders.id * 0))::numeric + 0.01))::double precision) IS NULL)
+   Rows Removed by Filter: 10
+   Heap Fetches: 10
+   Index Searches: 1
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=97
+ Planning Time: 0.737 ms
+ Execution Time: 168.165 ms
+(12 rows)
+
+[DML SAFETY: POSTGRESQL EXPLAIN ANALYZE EXECUTES; ROLLBACK RESTORES]
+ before_amount
+---------------
+          1.70
+(1 row)
+
+BEGIN
+                                                             QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------------------------
+ Update on public.orders  (cost=0.29..8.31 rows=0 width=0) (actual time=0.133..0.133 rows=0.00 loops=1)
+   Buffers: shared hit=14
+   WAL: records=5 bytes=352
+   ->  Index Scan using orders_pkey on public.orders  (cost=0.29..8.31 rows=1 width=22) (actual time=0.016..0.018 rows=1.00 loops=1)
+         Output: (amount + '100'::numeric), ctid
+         Index Cond: (orders.id = 1)
+         Index Searches: 1
+         Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=3
+ Planning Time: 0.118 ms
+ Execution Time: 0.216 ms
+(12 rows)
+
+ inside_transaction
+--------------------
+             101.70
+(1 row)
+
+ROLLBACK
+ after_rollback
+----------------
+           1.70
+(1 row)

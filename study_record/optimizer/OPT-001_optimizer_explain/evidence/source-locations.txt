@@ -1,0 +1,28 @@
+OPT-001 source anchors, MySQL 8.4.10 / PostgreSQL 18.4
+
+MySQL classic optimizer and executor
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/sql_optimizer.cc:362 JOIN::optimize
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/sql_optimizer.cc:722 JOIN::make_join_plan call
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/sql_optimizer.cc:5359 JOIN::make_join_plan
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/sql_optimizer.cc:5393 update_ref_and_keys builds ref access information
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/join_optimizer/access_path.cc:488 CreateIteratorFromAccessPath
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/sql_union.cc:1147 CreateIteratorFromAccessPath call
+
+MySQL EXPLAIN / ANALYZE
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/opt_explain.cc:2105 ExplainIterator
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/opt_explain.cc:2152 Query_result_null
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/opt_explain.cc:2247 explain_query
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/opt_explain.cc:2258 iterator-based branch
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/opt_explain.cc:2265 rejects missing root iterator
+/data/myhome/mydata/mysql-src/mysql-8.4.10/sql/opt_explain.cc:2273 executes query with suppressed result
+
+PostgreSQL planner / path competition / EXPLAIN baseline
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/plan/planner.c:321 standard_planner
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/plan/planner.c:453 subquery_planner call
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/plan/planner.c:669 subquery_planner
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/plan/planner.c:1896 query_planner call
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/path/allpaths.c:791 create SeqScan path
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/path/allpaths.c:798 create_index_paths call
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/path/indxpath.c:240 create_index_paths
+/data/soft/postgres/postgresql-18.4/src/backend/optimizer/util/pathnode.c:464 add_path
+/data/soft/postgres/postgresql-18.4/src/backend/commands/explain.c ExplainOnePlan / instrumentation output
