@@ -1,0 +1,107 @@
+REP-001 source locations
+Verified: 2026-09-03
+
+MySQL 8.4.10
+source: /data/myhome/mydata/mysql-src/mysql-8.4.10
+
+sql/sql_parse.cc:2340-2345
+  dispatch COM_BINLOG_DUMP_GTID to com_binlog_dump_gtid
+sql/sql_parse.cc:3580-3590
+  SQLCOM_SLAVE_START dispatch to start_slave_cmd
+sql/rpl_replica.cc:733-820
+  START REPLICA command/channel entry
+sql/rpl_replica.cc:1985-2045
+  create one replication thread and wait for start state
+sql/rpl_replica.cc:2061-2150
+  start_slave_threads independently launches receiver and applier
+sql/rpl_replica.cc:4137-4215
+  request_dump selects COM_BINLOG_DUMP_GTID and encodes received+executed set
+sql/rpl_replica.cc:5314-5695
+  handle_slave_io connect/register/request/read/queue main path
+sql/rpl_replica.cc:6972-7335
+  handle_slave_sql and exec_relay_log_event applier main path
+sql/rpl_replica.cc:7596-8225
+  queue_event writes relay log and advances Retrieved_Gtid_Set at transaction boundary
+sql/rpl_source.cc:973-1038
+  parse COM_BINLOG_DUMP_GTID request and replica GTID set
+sql/rpl_source.cc:1043-1060
+  mysql_binlog_send creates and runs Binlog_sender
+sql/rpl_binlog_sender.h:48-230
+  Binlog_sender ownership, GTID set, file/position and packet state
+sql/rpl_binlog_sender.cc:264-385
+  Binlog_sender::init validates request and server binlog state
+sql/rpl_binlog_sender.cc:386-496
+  Binlog_sender::run main lifecycle
+sql/rpl_binlog_sender.cc:497-680
+  send_binlog/send_events reads and sends binlog events
+sql/rpl_binlog_sender.cc:901-970
+  GTID auto-position finds first binlog not covered by replica set
+sql/rpl_mi.h:87-210
+  Master_info connection/receiver ownership and state
+sql/rpl_mi.h:630-710
+  received GTID set and transaction-boundary state
+sql/rpl_rli.h:203-430
+  Relay_log_info applier owner, relay_log and recovery state
+sql/rpl_info_factory.cc:720-850
+  table-backed source/applier metadata repository creation
+sql/binlog.cc:4191-4330
+  rebuild Retrieved_Gtid_Set from relay logs
+sql/binlog.cc:6900-6980
+  add fully received transaction to received GTID set
+sql/log_event.cc:13550-13630
+  Gtid_log_event::do_shall_skip checks already executed GTIDs
+sql/item_gtid_func.cc:64-135
+  WAIT_FOR_EXECUTED_GTID_SET validation and wait path
+storage/perfschema/table_replication_connection_status.cc
+  replication_connection_status table projection
+storage/perfschema/table_replication_applier_status.cc
+  replication_applier_status table projection
+
+PostgreSQL 18.4
+source: /data/soft/postgres/postgresql-18.4
+
+src/backend/replication/walsender.c:809-980
+  StartReplication validates physical startpoint and enters sender loop
+src/backend/replication/walsender.c:2167-2180
+  replication command dispatch
+src/backend/replication/walsender.c:2423-2525
+  ProcessStandbyReplyMessage updates write/flush/apply feedback
+src/backend/replication/walsender.c:2806-3110
+  WalSndLoop lifecycle and catchup/streaming transitions
+src/backend/replication/walsender.c:3118-3510
+  XLogSendPhysical reads and sends WAL bytes
+src/include/replication/walsender_private.h:24-84
+  WalSndState and WalSnd shared-memory progress fields
+src/backend/replication/walreceiverfuncs.c:246-330
+  RequestXLogStreaming requests/starts walreceiver
+src/backend/replication/walreceiver.c:152-620
+  WalReceiverMain connection, receive, flush and reply loop
+src/backend/replication/walreceiver.c:819-885
+  XLogWalRcvProcessMsg parses WAL data/keepalive messages
+src/backend/replication/walreceiver.c:890-1055
+  XLogWalRcvWrite and XLogWalRcvFlush
+src/backend/replication/walreceiver.c:1092-1175
+  XLogWalRcvSendReply reports write/flush/apply LSN
+src/include/replication/walreceiver.h:42-130
+  WalRcvState and WalRcvData shared-memory fields
+src/backend/access/transam/xlogrecovery.c:1671-1900
+  PerformWalRecovery applies WAL independently of walreceiver
+src/backend/access/transam/xlogrecovery.c:2947-2985
+  recoveryPausesHere waits while replay is paused
+src/backend/access/transam/xlogrecovery.c:3112-3142
+  SetRecoveryPause state transitions
+src/backend/access/transam/xlogrecovery.c:3895-3945
+  recovery requests streaming and observes walreceiver flush progress
+src/backend/access/transam/xlogfuncs.c:512-570
+  pg_wal_replay_pause/resume SQL entry
+
+PG baseline articles inspected
+/data/myfuture/src/func/repl/Physical_Replication_物理复制流程.md
+/data/myfuture/src/func/repl/WalReceiver_流复制接收流程.md
+/data/myfuture/src/func/repl/Sync_vs_Async_Replication_同步与异步复制对比.md
+
+Boundary note:
+The older PG Physical_Replication article says physical replication does not
+support DDL replication. That statement is not carried forward: physical WAL
+replay reproduces cluster changes including DDL. Local PG 18.4 source and the
+physical byte-stream architecture are the authority for this topic.

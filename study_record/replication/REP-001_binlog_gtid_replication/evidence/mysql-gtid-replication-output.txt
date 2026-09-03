@@ -1,0 +1,86 @@
+[VERSIONS AND IDENTITIES]
+8.4.10	33321	1301	480c52c4-a736-11f1-9bc6-000c29951355	ON	ROW
+8.4.10	33322	1302	4a472cae-a736-11f1-9ee4-000c29951355	ON	ROW
+[SOURCE BEFORE REPLICATION]
+100	480c52c4-a736-11f1-9bc6-000c29951355:1-5
+binlog.000002	4012			480c52c4-a736-11f1-9bc6-000c29951355:1-5
+[AUTO-POSITION CAUGHT UP]
+100	480c52c4-a736-11f1-9bc6-000c29951355:1-5
+	ON	0
+	ON
+[RECEIVER RUNNING, APPLIER STOPPED]
+100	480c52c4-a736-11f1-9bc6-000c29951355:1-5
+	ON	480c52c4-a736-11f1-9bc6-000c29951355:1-6	0
+	OFF
+*************************** 1. row ***************************
+Waiting for source to send event
+127.0.0.1
+repl
+33321
+60
+binlog.000002
+9789
+relay-bin.000002
+4223
+binlog.000002
+Yes
+No
+
+
+
+
+
+
+0
+
+0
+4012
+10205
+None
+
+0
+No
+
+
+
+
+
+NULL
+No
+0
+
+0
+
+
+1301
+480c52c4-a736-11f1-9bc6-000c29951355
+mysql.slave_master_info
+0
+NULL
+
+10
+
+
+
+
+
+480c52c4-a736-11f1-9bc6-000c29951355:1-6
+480c52c4-a736-11f1-9bc6-000c29951355:1-5
+1
+
+
+
+
+1
+
+[APPLIER RESTARTED AND CAUGHT UP]
+300	480c52c4-a736-11f1-9bc6-000c29951355:1-6
+0
+[REPLICA RESTART PERSISTENCE]
+300	480c52c4-a736-11f1-9bc6-000c29951355:1-6
+	ON	0
+[AUTO-POSITION REQUIRED GTID WAS PURGED]
+301	480c52c4-a736-11f1-9bc6-000c29951355:1-7
+binlog.000003	198	No
+300	480c52c4-a736-11f1-9bc6-000c29951355:1-6
+	OFF	13114	Got fatal error 1236 from source when reading data from binary log: 'Cannot replicate because the source purged required binary logs. Replicate the missing transactions from elsewhere, or provision a new replica from backup. Consider increasing the source's binary log expiration period. The GTID set sent by the replica is '480c52c4-a736-11f1-9bc6-000c29951355:1-6', and the missing transactions are '480c52c4-a736-11f1-9bc6-000c29951355:7''

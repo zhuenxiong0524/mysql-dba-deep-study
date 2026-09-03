@@ -42,9 +42,10 @@
 | pg_locks / pg_blocking_pids() | performance_schema.data_locks/data_lock_waits 或 INNODB_TRX + InnoDB status | 🔶 | PG 系统视图直接查；本机 MySQL P_S=OFF，以 INNODB_TRX/PROCESSLIST/status 兜底 | ISO-001 |
 | pg_stat_activity | SHOW PROCESSLIST / P_S.threads | 🔶 | 本机 P_S=OFF，用 PROCESSLIST + status 计数兜底 | MON-001 |
 | pg_stat_statements | P_S.events_statements_summary / slow log | 🔶 | 本机 P_S=OFF，用 slow log + performance_schema 需启用 | MON-001 |
-| pg_basebackup | xtrabackup（未装）/ CLONE | 🔶 | 本环境物理备份工具缺失，备份走 mysqldump+binlog | BAK-001/002 |
-| WAL PITR（restore_command） | binlog + mysqlbinlog PITR | 🔶 | 逻辑回放，需 binlog 在库（log_bin=ON 已确认） | LOG-001 |
-| Streaming Replication | Binlog Replication（source→replica） | ❌ | 异步/半同步 + GTID，relay log 中转 | REP-001 |
+| pg_basebackup | Percona XtraBackup | 🔶 | PG 由 WAL 统一完成备份一致性和 PITR；MySQL 用 XtraBackup redo prepare，再从 binlog 交接点推进 | BAK-001/002 + LOG-001 |
+| WAL PITR（restore_command） | binlog + mysqlbinlog PITR | 🔶 | PG 回放物理 WAL；MySQL 回放逻辑 binlog，必须从物理备份记录的 file/position 或 GTID 连续衔接 | BAK-001/002 + LOG-001 |
+| walsender → walreceiver → startup replay | Binlog_sender → receiver → relay log → applier | ❌ | PG 传物理 WAL/LSN；MySQL 传 binlog event/GTID；两边的接收进度都不等于应用进度 | REP-001 |
+| timeline + LSN streaming startpoint | `SOURCE_AUTO_POSITION=1` + GTID set | ❌ | MySQL 以已接收/已执行 GTID 集合求缺失事务，但 GTID 集合不包含事务内容，所需 binlog 被清除仍会失败 1236 | REP-001 |
 | EXPLAIN ANALYZE | EXPLAIN ANALYZE / EXPLAIN TREE | ✅ | 概念类似，格式与字段不同 | OPT-001 |
 | 日志：postgresql.log | error.log + slow_query_log + general_log | 🔶 | error log 最核心；slow log 默认关 | MON-001 |
 | 参数持久化 ALTER SYSTEM | SET PERSIST / SET PERSIST_ONLY | 🔶 | 均写盘（auto.conf vs mysqld-auto.cnf）；PG reload/pending_restart，MySQL 静态参数报 1238 | ENV-006 |

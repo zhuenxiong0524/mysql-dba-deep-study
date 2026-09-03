@@ -222,6 +222,28 @@ PG 对照：`pg_stat_activity + pg_blocking_pids(pid) + pg_locks`；40P01 是死
 - CPU/IO/磁盘 → MON-001/DR-001
 - 备份恢复 → BAK-001/002
 
+## GTID 复制是否真的正常？（REP-001 实测）
+
+```sql
+SELECT CHANNEL_NAME,SERVICE_STATE,LAST_ERROR_NUMBER,LAST_ERROR_MESSAGE,
+       RECEIVED_TRANSACTION_SET
+FROM performance_schema.replication_connection_status;
+
+SELECT CHANNEL_NAME,SERVICE_STATE
+FROM performance_schema.replication_applier_status;
+
+SELECT @@GLOBAL.gtid_executed;
+SHOW REPLICA STATUS\G
+```
+
+判断与处置：
+
+- connection `ON` 只表示 receiver 在工作；applier `OFF` 时数据仍不可见，比较 received 与 executed 集合。
+- 取得 source GTID 后用 `WAIT_FOR_EXECUTED_GTID_SET(gtid, timeout)` 有界等待：0=追到，1=超时，NULL=错误。
+- receiver 错误含 1236 / purged required binary logs：缺失事务内容已不在 source，不能靠 GTID 跳过；从其他节点补日志或用新备份重建副本。
+- 不要把 `Seconds_Behind_Source=0` 当唯一健康指标；同时看两线程状态、最后错误、集合差和业务校验。
+- MySQL 8.4 不再接受 `source_info_repository` / `relay_log_info_repository` 旧配置；复制元数据已使用系统表。
+
 ## 磁盘空间 / 表大小（ENG-002 实测）
 
 ```sql

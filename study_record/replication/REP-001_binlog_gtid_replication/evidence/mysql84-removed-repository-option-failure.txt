@@ -1,0 +1,16 @@
+MySQL 8.4.10 replica initialization failure with an obsolete option
+Observed: 2026-09-03
+
+Configuration attempted:
+source_info_repository=TABLE
+relay_log_info_repository=TABLE
+
+Server error log:
+2026-09-03T01:17:01.160737Z 0 [ERROR] [MY-000067] [Server] unknown variable 'source_info_repository=TABLE'.
+2026-09-03T01:17:01.161177Z 0 [ERROR] [MY-013236] [Server] The designated data directory /data/myhome/mydata/mysql-rep13-replica/ is unusable. You can remove all files that the server added to it.
+2026-09-03T01:17:01.161187Z 0 [ERROR] [MY-010119] [Server] Aborting
+
+Resolution:
+Remove source_info_repository and relay_log_info_repository from MySQL 8.4
+configuration. The replication metadata repository is table-based in this
+version; restart persistence is verified by the main lab instead of inferred.
